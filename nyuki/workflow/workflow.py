@@ -25,7 +25,8 @@ from .api.templates import (
 )
 from .api.workflows import (
     ApiWorkflow, ApiWorkflows, ApiWorkflowsHistory, ApiWorkflowHistory,
-    ApiWorkflowTriggers, ApiWorkflowTrigger
+    ApiWorkflowTriggers, ApiWorkflowTrigger, ApiWorkflowHistoryTask,
+    ApiWorkflowHistoryTaskData,
 )
 from .api.vars import (
     ApiVars, ApiVarsVersion, ApiVarsDraft
@@ -183,6 +184,8 @@ class WorkflowNyuki(Nyuki):
         ApiWorkflow,  # /v1/workflows/{uid}
         ApiWorkflowsHistory,  # /v1/workflows/history
         ApiWorkflowHistory,  # /v1/workflows/history/{uid}
+        ApiWorkflowHistoryTask,  # /v1/workflows/history/{uid}/tasks/{task_id}
+        ApiWorkflowHistoryTaskData,  # /v1/workflows/history/{uid}/tasks/{task_id}/data
         ApiFactoryRegexes,  # /v1/workflows/regexes
         ApiFactoryRegex,  # /v1/workflows/regexes/{uid}
         ApiFactoryLookups,  # /v1/workflows/lookups

@@ -37,6 +37,36 @@ class InstanceCollection:
 
     REQUESTER_REGEX = re.compile(r'^nyuki://.*')
 
+    # TODO: Many fields may not be necessary for the frontend.
+    HISTORY_FILTERS = {
+        '_id': 0,
+        # Workflow
+        'id': 1,
+        'policy': 1,
+        'topics': 1,
+        'graph': 1,
+        'version': 1,
+        'draft': 1,
+        'title': 1,
+        'tags': 1,
+        'exec': 1,
+        # Tasks
+        'tasks.id': 1,
+        'tasks.name': 1,
+        'tasks.config': 1,
+        'tasks.topics': 1,
+        'tasks.title': 1,
+        # Exec
+        'tasks.exec.id': 1,
+        'tasks.exec.start': 1,
+        'tasks.exec.end': 1,
+        'tasks.exec.state': 1,
+        # Graph-specific data fields
+        'tasks.exec.outputs.quorum': 1,
+        'tasks.exec.reporting.status': 1,
+        'tasks.exec.reporting.errors': 1,
+    }
+
     def __init__(self, instances_collection):
         self._instances = instances_collection
         asyncio.ensure_future(self._instances.create_index('exec.id', unique=True))
@@ -47,11 +77,34 @@ class InstanceCollection:
         asyncio.ensure_future(self._instances.create_index('exec.start'))
         asyncio.ensure_future(self._instances.create_index('exec.end'))
 
-    async def get_one(self, exec_id):
+    async def get_one(self, exec_id, full=False):
         """
         Return the instance with `exec_id` from workflow history.
         """
-        return await self._instances.find_one({'exec.id': exec_id}, {'_id': 0})
+        filters = self.HISTORY_FILTERS if full is False else {'_id': 0}
+        return await self._instances.find_one({'exec.id': exec_id}, filters)
+
+    async def get_task(self, task_id, full=False):
+        """
+        Return the execution data of one single task.
+        """
+        result = await self._instances.find_one(
+            {'tasks': {'$elemMatch': {'exec.id': task_id}}}, {'tasks.$': 1}
+        )
+        try:
+            result = result['tasks'][0]
+        except (KeyError, IndexError):
+            return None
+
+        # Remove inputs and outputs if not needed.
+        if full is False:
+            for data in ('inputs', 'outputs'):
+                try:
+                    del result['exec'][data]
+                except KeyError:
+                    continue
+
+        return result
 
     async def get(self, root=False, full=False, offset=None, limit=None,
                   since=None, state=None, search=None, order=None):
@@ -367,12 +420,40 @@ class ApiWorkflowHistory:
 
     async def get(self, request, uid):
         try:
-            workflow = await self.nyuki.storage.instances.get_one(uid)
+            workflow = await self.nyuki.storage.instances.get_one(
+                uid, (request.GET.get('full') == '1')
+            )
         except AutoReconnect:
             return Response(status=503)
         if not workflow:
             return Response(status=404)
         return Response(workflow)
+
+
+@resource('/workflow/history/{uid}/tasks/{task_id}', versions=['v1'])
+class ApiWorkflowHistoryTask:
+
+    async def get(self, request, uid, task_id):
+        try:
+            task = await self.nyuki.storage.instances.get_task(task_id)
+        except AutoReconnect:
+            return Response(status=503)
+        if not task:
+            return Response(status=404)
+        return Response(task)
+
+
+@resource('/workflow/history/{uid}/tasks/{task_id}/data', versions=['v1'])
+class ApiWorkflowHistoryTaskData:
+
+    async def get(self, request, uid, task_id):
+        try:
+            task = await self.nyuki.storage.instances.get_task(task_id, True)
+        except AutoReconnect:
+            return Response(status=503)
+        if not task:
+            return Response(status=404)
+        return Response(task)
 
 
 @resource('/workflow/triggers', versions=['v1'])
