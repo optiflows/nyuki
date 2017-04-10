@@ -199,8 +199,8 @@ class WorkflowNyuki(Nyuki):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.register_schema(self.CONF_SCHEMA)
         self.migrate_config()
+        self.register_schema(self.CONF_SCHEMA)
         self.engine = None
         self.storage = None
 

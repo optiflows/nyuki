@@ -213,7 +213,7 @@ class MqttBus(Service):
             log.debug("MQTT unsubscription from %s->%s", topic, callback.__name__)
             self._subscriptions[topic].callbacks.remove(callback)
 
-        if callback is None or not self._subscriptions[topic]:
+        if callback is None or not self._subscriptions[topic].callbacks:
             del self._subscriptions[topic]
             await self.client.unsubscribe([topic])
             log.info('Unsubscribed from %s', topic)
@@ -253,9 +253,10 @@ class MqttBus(Service):
             # Implies QOS_0
             await self.client.publish(topic, data.encode())
             status = EventStatus.SENT
-            log.info('Event successfully sent to topic %s', topic)
+            log.debug('Event successfully sent to topic %s', topic)
         else:
             status = EventStatus.FAILED
+            log.error('Failed to send event to topic %s', topic)
 
         if self._persistence:
             await self._persistence.update(previous_uid or uid, status)

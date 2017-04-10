@@ -122,24 +122,19 @@ class _WorkflowResource:
 
     def register_async_handler(self, async_topic, wflow):
         broker = get_broker()
+        topic = '{}/{}'.format(EXEC_TOPIC, wflow.uid)
 
         async def exec_handler(event):
-            # Pass if event does not concern this workflow execution
-            if event.source._workflow_exec_id != wflow.uid:
-                return
             # Publish the event's data
-            # TODO: Beware of unserializable objects
-            asyncio.ensure_future(self.nyuki.bus.publish(
-                event.data, topic=async_topic
-            ))
+            await self.nyuki.bus.publish(event.data, async_topic)
             # If the workflow is in a final state, unregister
             if event.data['type'] in [
                 WorkflowExecState.end.value,
                 WorkflowExecState.error.value
             ]:
-                broker.unregister(exec_handler, topic=EXEC_TOPIC)
+                broker.unregister(exec_handler, topic=topic)
 
-        broker.register(exec_handler, topic=EXEC_TOPIC)
+        broker.register(exec_handler, topic=topic)
 
 
 @resource('/workflow/instances', ['v1'], 'application/json')
