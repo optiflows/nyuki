@@ -93,7 +93,7 @@ class InstanceCollection:
         )
         try:
             result = result['tasks'][0]
-        except (KeyError, IndexError):
+        except (KeyError, IndexError, TypeError):
             return None
 
         # Remove inputs and outputs if not needed.
