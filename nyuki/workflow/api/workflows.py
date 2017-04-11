@@ -122,7 +122,7 @@ class _WorkflowResource:
 
     def register_async_handler(self, async_topic, wflow):
         broker = get_broker()
-        topic = '{}/{}'.format(EXEC_TOPIC, wflow.uid)
+        topic = '/'.join((EXEC_TOPIC, wflow.uid))
 
         async def exec_handler(event):
             # Publish the event's data
