@@ -17,7 +17,7 @@ from .persistence import BusPersistence, EventStatus, PersistenceError
 log = logging.getLogger(__name__)
 
 
-MQTTCallback = namedtuple('MQTTCallback', ['regex', 'callbacks'])
+MQTTTopic = namedtuple('MQTTTopic', ['regex', 'callbacks'])
 
 
 class MqttBus(Service):
@@ -193,7 +193,7 @@ class MqttBus(Service):
         try:
             self._subscriptions[topic].callbacks.add(callback)
         except KeyError:
-            self._subscriptions[topic] = MQTTCallback(
+            self._subscriptions[topic] = MQTTTopic(
                 regex=self._regex_topic(topic),
                 callbacks={callback},
             )
