@@ -86,7 +86,7 @@ class InstanceCollection:
 
     async def get_task(self, task_id, full=False):
         """
-        Return the execution data of one single task.
+        Return the informations of one single executed task.
         """
         result = await self._instances.find_one(
             {'tasks': {'$elemMatch': {'exec.id': task_id}}}, {'tasks.$': 1}
@@ -105,6 +105,23 @@ class InstanceCollection:
                     continue
 
         return result
+
+    async def get_task_data(self, task_id):
+        """
+        Return the data of one executed task.
+        """
+        result = await self._instances.find_one(
+            {'tasks': {'$elemMatch': {'exec.id': task_id}}}, {'tasks.$': 1}
+        )
+        try:
+            result = result['tasks'][0]
+        except (KeyError, IndexError, TypeError):
+            return None
+
+        return {
+            'inputs': result['exec']['inputs'],
+            'outputs': result['exec']['outputs'],
+        }
 
     async def get(self, root=False, full=False, offset=None, limit=None,
                   since=None, state=None, search=None, order=None):
@@ -435,7 +452,9 @@ class ApiWorkflowHistoryTask:
 
     async def get(self, request, uid, task_id):
         try:
-            task = await self.nyuki.storage.instances.get_task(task_id)
+            task = await self.nyuki.storage.instances.get_task(
+                task_id, (request.GET.get('full') == '1')
+            )
         except AutoReconnect:
             return Response(status=503)
         if not task:
@@ -448,7 +467,7 @@ class ApiWorkflowHistoryTaskData:
 
     async def get(self, request, uid, task_id):
         try:
-            task = await self.nyuki.storage.instances.get_task(task_id, True)
+            task = await self.nyuki.storage.instances.get_task_data(task_id)
         except AutoReconnect:
             return Response(status=503)
         if not task:
