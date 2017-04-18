@@ -109,7 +109,7 @@ class MongoStorage:
 
         # Collections
         self.templates = TemplateCollection(db['templates'], db['metadata'])
-        self.instances = InstanceCollection(db['instances'])
+        self.instances = InstanceCollection(db)
         self.regexes = _DataProcessingCollection(db['regexes'])
         self.lookups = _DataProcessingCollection(db['lookups'])
         self.triggers = _TriggerCollection(db['triggers'])

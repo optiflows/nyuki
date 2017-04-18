@@ -36,92 +36,89 @@ class Ordering(Enum):
 class InstanceCollection:
 
     REQUESTER_REGEX = re.compile(r'^nyuki://.*')
-
     # TODO: Many fields may not be necessary for the frontend.
-    HISTORY_FILTERS = {
+    TASK_HISTORY_FILTERS = {
         '_id': 0,
-        # Workflow
-        'id': 1,
-        'policy': 1,
-        'topics': 1,
-        'graph': 1,
-        'version': 1,
-        'draft': 1,
-        'title': 1,
-        'tags': 1,
-        'exec': 1,
         # Tasks
-        'tasks.id': 1,
-        'tasks.name': 1,
-        'tasks.config': 1,
-        'tasks.topics': 1,
-        'tasks.title': 1,
+        'id': 1,
+        'name': 1,
+        'config': 1,
+        'topics': 1,
+        'title': 1,
         # Exec
-        'tasks.exec.id': 1,
-        'tasks.exec.start': 1,
-        'tasks.exec.end': 1,
-        'tasks.exec.state': 1,
+        'exec.id': 1,
+        'exec.start': 1,
+        'exec.end': 1,
+        'exec.state': 1,
         # Graph-specific data fields
-        'tasks.exec.outputs.quorum': 1,
-        'tasks.exec.reporting.status': 1,
-        'tasks.exec.reporting.errors': 1,
+        'exec.outputs.quorum': 1,
+        'exec.reporting.status': 1,
+        'exec.reporting.errors': 1,
     }
 
-    def __init__(self, instances_collection):
-        self._instances = instances_collection
-        asyncio.ensure_future(self._instances.create_index('exec.id', unique=True))
-        asyncio.ensure_future(self._instances.create_index('exec.state'))
-        asyncio.ensure_future(self._instances.create_index('exec.requester'))
+    def __init__(self, db):
+        self._workflows = db['workflow-instances']
+        self._tasks = db['task-instances']
+        asyncio.ensure_future(self.index())
+
+    async def index(self):
+        # Workflow
+        await self._workflows.create_index('exec.id', unique=True)
+        await self._workflows.create_index('exec.state')
+        await self._workflows.create_index('exec.requester')
         # Search and sorting indexes
-        asyncio.ensure_future(self._instances.create_index('title'))
-        asyncio.ensure_future(self._instances.create_index('exec.start'))
-        asyncio.ensure_future(self._instances.create_index('exec.end'))
+        await self._workflows.create_index('title')
+        await self._workflows.create_index('exec.start')
+        await self._workflows.create_index('exec.end')
+        # Task
+        await self._tasks.create_index('workflow_exec_id')
+        await self._tasks.create_index('exec.id')
+
+    async def _get_wflow_tasks(self, workflow_exec_id, full=False):
+        """
+        Fetch the list of task execs for this workflow exec.
+        """
+        cursor = self._tasks.find(
+            {'workflow_exec_id': workflow_exec_id},
+            self.TASK_HISTORY_FILTERS if full is False else {'_id': 0},
+        )
+        return await cursor.to_list(None)
 
     async def get_one(self, exec_id, full=False):
         """
         Return the instance with `exec_id` from workflow history.
         """
-        filters = self.HISTORY_FILTERS if full is False else {'_id': 0}
-        return await self._instances.find_one({'exec.id': exec_id}, filters)
+        workflow = await self._workflows.find_one({'exec.id': exec_id}, {'_id': 0})
+        if workflow:
+            workflow['tasks'] = await self._get_wflow_tasks(exec_id, full)
+        return workflow
 
     async def get_task(self, task_id, full=False):
         """
         Return the informations of one single executed task.
         """
-        result = await self._instances.find_one(
-            {'tasks': {'$elemMatch': {'exec.id': task_id}}}, {'tasks.$': 1}
-        )
-        try:
-            result = result['tasks'][0]
-        except (KeyError, IndexError, TypeError):
-            return None
+        task = await self._tasks.find_one({'exec.id': task_id}, {'_id': 0})
 
         # Remove inputs and outputs if not needed.
-        if full is False:
+        if task and full is False:
             for data in ('inputs', 'outputs'):
                 try:
-                    del result['exec'][data]
+                    del task['exec'][data]
                 except KeyError:
                     continue
 
-        return result
+        return task
 
     async def get_task_data(self, task_id):
         """
         Return the data of one executed task.
         """
-        result = await self._instances.find_one(
-            {'tasks': {'$elemMatch': {'exec.id': task_id}}}, {'tasks.$': 1}
-        )
-        try:
-            result = result['tasks'][0]
-        except (KeyError, IndexError, TypeError):
-            return None
-
-        return {
-            'inputs': result['exec']['inputs'],
-            'outputs': result['exec']['outputs'],
-        }
+        task = await self._tasks.find_one({'exec.id': task_id}, {'_id': 0})
+        if task:
+            return {
+                'inputs': task['exec']['inputs'],
+                'outputs': task['exec']['outputs'],
+            }
 
     async def get(self, root=False, full=False, offset=None, limit=None,
                   since=None, state=None, search=None, order=None):
@@ -151,7 +148,7 @@ class InstanceCollection:
         else:
             fields = {'_id': 0}
 
-        cursor = self._instances.find(query, fields)
+        cursor = self._workflows.find(query, fields)
         # Count total results regardless of limit/offset
         count = await cursor.count()
 
@@ -169,19 +166,33 @@ class InstanceCollection:
             cursor.limit(limit)
 
         # Execute query
-        return count, await cursor.to_list(None)
+        workflows = await cursor.to_list(None)
+        if full is True:
+            for workflow in workflows:
+                workflow['tasks'] = await self._get_wflow_tasks(
+                    workflow['exec']['id'], True
+                )
+        return count, workflows
 
     async def insert(self, workflow):
         """
         Insert a finished workflow report into the workflow history.
         """
+        # Split tasks exec and workflow exec.
+        task_exec_ids = list()
+        for task in workflow['tasks']:
+            task['workflow_exec_id'] = workflow['exec']['id']
+            await self._tasks.insert(task)
+            task_exec_ids.append(task['exec']['id'])
+        workflow['tasks'] = task_exec_ids
+
         try:
-            await self._instances.insert(workflow)
+            await self._workflows.insert(workflow)
         except DuplicateKeyError:
             # If it's a duplicate, we don't want to lose it
             workflow['exec']['duplicate'] = workflow['exec']['id']
             workflow['exec']['id'] = str(uuid4())
-            await self._instances.insert(workflow)
+            await self._workflows.insert(workflow)
 
 
 class _WorkflowResource:
