@@ -17,7 +17,7 @@ from .persistence import BusPersistence, EventStatus, PersistenceError
 log = logging.getLogger(__name__)
 
 
-MQTTTopic = namedtuple('MQTTTopic', ['regex', 'callbacks'])
+MQTTRegex = namedtuple('MQTTRegex', ['regex', 'callbacks'])
 
 
 class MqttBus(Service):
@@ -73,6 +73,7 @@ class MqttBus(Service):
         self._pending = {}
         self.name = None
         self._subscriptions = {}
+        self._regex_subscriptions = {}
 
         # Coroutines
         self.connect_future = None
@@ -187,42 +188,78 @@ class MqttBus(Service):
         if not asyncio.iscoroutinefunction(callback):
             raise ValueError('event callback must be a coroutine')
 
-        log.debug('MQTT subscription to %s->%s', topic, callback.__name__)
+        log.debug('MQTT subscription to %s -> %s', topic, callback.__name__)
         await self.client.subscribe([(topic, QOS_1)])
 
-        try:
-            self._subscriptions[topic].callbacks.add(callback)
-        except KeyError:
-            self._subscriptions[topic] = MQTTTopic(
-                regex=self._regex_topic(topic),
-                callbacks={callback},
-            )
-        log.info(
-            'Subscribed to %s: %s callback(s)',
-            topic, len(self._subscriptions[topic].callbacks)
-        )
+        # Regexes are about topics like 'word/+/word' or 'word/#'
+        is_regex = '/+' in topic or topic.endswith('#')
+        if is_regex is True:
+            try:
+                self._regex_subscriptions[topic].callbacks.add(callback)
+            except KeyError:
+                self._regex_subscriptions[topic] = MQTTRegex(
+                    regex=self._regex_topic(topic),
+                    callbacks={callback},
+                )
+        # Standard topics are a simple dict/set pair.
+        else:
+            try:
+                self._subscriptions[topic].add(callback)
+            except KeyError:
+                self._subscriptions[topic] = {callback}
 
-    async def unsubscribe(self, topic, callback=None):
+        log.info('Subscribed to %s', topic)
+
+    async def _unsub_regex(self, topic, callback):
         """
-        Unsubscribe from the topic, remove callback if set
+        Unsubscribe from a regex topic.
+        """
+        if topic not in self._regex_subscriptions:
+            return
+        if callback in self._regex_subscriptions[topic].callbacks:
+            log.debug(
+                'MQTT unsubscription from %s -> %s',
+                topic, callback.__name__,
+            )
+            self._regex_subscriptions[topic].callbacks.remove(callback)
+        if callback is None or not self._regex_subscriptions[topic].callbacks:
+            del self._regex_subscriptions[topic]
+            await self.client.unsubscribe([topic])
+            log.info('Unsubscribed from %s', topic)
+
+    async def _unsub(self, topic, callback):
+        """
+        Unsubscribe from a standard topic.
         """
         if topic not in self._subscriptions:
             return
-
-        if callback in self._subscriptions[topic].callbacks:
-            log.debug("MQTT unsubscription from %s->%s", topic, callback.__name__)
-            self._subscriptions[topic].callbacks.remove(callback)
-
-        if callback is None or not self._subscriptions[topic].callbacks:
+        if callback in self._subscriptions[topic]:
+            log.debug(
+                'MQTT unsubscription from %s -> %s',
+                topic, callback.__name__,
+            )
+            self._subscriptions[topic].remove(callback)
+        if callback is None or not self._subscriptions[topic]:
             del self._subscriptions[topic]
             await self.client.unsubscribe([topic])
             log.info('Unsubscribed from %s', topic)
+
+    async def unsubscribe(self, topic, callback=None):
+        """
+        Unsubscribe from a topic, remove callback if set.
+        """
+        if '/+' in topic or topic.endswith('#'):
+            await self._unsub_regex(topic, callback)
+        else:
+            await self._unsub(topic, callback)
 
     async def _resubscribe(self):
         """
         Resubscribe on reconnection.
         """
-        for topic in self._subscriptions.keys():
+        subs = list(self._subscriptions.keys()) + \
+            list(self._regex_subscriptions.keys())
+        for topic in subs:
             log.debug('Resubscribing to %s', topic)
             await self.client.subscribe([(topic, QOS_1)])
 
@@ -307,14 +344,18 @@ class MqttBus(Service):
                 break
 
             topic = message.topic
+            data = json.loads(message.data.decode())
 
-            # Ignore own message
-            if topic == self.name:
-                continue
-
-            for mqtt_callback in self._subscriptions.values():
-                if mqtt_callback.regex.match(topic):
-                    data = json.loads(message.data.decode())
+            # Iterate and call all regex topics callbacks
+            for mqttregex in self._regex_subscriptions.values():
+                if mqttregex.regex.match(topic):
                     log.debug("Event from topic '%s': %s", topic, data)
-                    for callback in mqtt_callback.callbacks:
-                        asyncio.ensure_future(callback(topic, data))
+                    for callback in mqttregex.callbacks:
+                        asyncio.ensure_future(callback(topic, data.copy()))
+
+            try:
+                # Iterate and call all single topic callbacks
+                for callback in self._subscriptions[topic]:
+                    asyncio.ensure_future(callback(topic, data.copy()))
+            except KeyError:
+                pass
