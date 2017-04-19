@@ -199,13 +199,19 @@ class _WorkflowResource:
     Share methods between workflow resources
     """
 
-    def register_async_handler(self, async_topic, wflow):
+    def register_async_handler(self, async_topic, events, wflow):
         broker = get_broker()
         topic = '/'.join((EXEC_TOPIC, wflow.uid))
 
+        if events:
+            events = events.split(',')
+
         async def exec_handler(event):
-            # Publish the event's data
-            await self.nyuki.bus.publish(event.data, async_topic)
+            # Publish the event's data if requested.
+            if events and event.data['type'] in events:
+                await self.nyuki.bus.publish(event.data, async_topic)
+            elif not events:
+                await self.nyuki.bus.publish(event.data, async_topic)
             # If the workflow is in a final state, unregister
             if event.data['type'] in [
                 WorkflowExecState.end.value,
@@ -238,6 +244,7 @@ class ApiWorkflows(_WorkflowResource):
         }
         """
         async_topic = request.headers.get('X-Surycat-Async-Topic')
+        async_events = request.headers.get('X-Surycat-Async-Events')
         exec_track = request.headers.get('X-Surycat-Exec-Track')
         requester = request.headers.get('Referer')
         request = await request.json()
@@ -308,7 +315,7 @@ class ApiWorkflows(_WorkflowResource):
         )
         # Handle async workflow exec updates
         if async_topic is not None:
-            self.register_async_handler(async_topic, wflow)
+            self.register_async_handler(async_topic, async_events, wflow)
 
         return Response(wfinst.report())
 
