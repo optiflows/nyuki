@@ -33,7 +33,7 @@ class Ordering(Enum):
         return [key for key in cls.__members__.keys()]
 
 
-class InstanceManager:
+class InstanceCollections:
 
     REQUESTER_REGEX = re.compile(r'^nyuki://.*')
     # TODO: Many fields may not be necessary for the frontend.
