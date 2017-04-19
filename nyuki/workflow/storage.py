@@ -2,8 +2,8 @@ import asyncio
 import logging
 from motor.motor_asyncio import AsyncIOMotorClient
 
+from .api.workflows import InstanceManager
 from .api.templates import TemplateCollection
-from .api.workflows import InstanceCollection
 
 
 log = logging.getLogger(__name__)
@@ -109,7 +109,7 @@ class MongoStorage:
 
         # Collections
         self.templates = TemplateCollection(db['templates'], db['metadata'])
-        self.instances = InstanceCollection(db)
+        self.instances = InstanceManager(db)
         self.regexes = _DataProcessingCollection(db['regexes'])
         self.lookups = _DataProcessingCollection(db['lookups'])
         self.triggers = _TriggerCollection(db['triggers'])

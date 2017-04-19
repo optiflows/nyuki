@@ -33,7 +33,7 @@ class Ordering(Enum):
         return [key for key in cls.__members__.keys()]
 
 
-class InstanceCollection:
+class InstanceManager:
 
     REQUESTER_REGEX = re.compile(r'^nyuki://.*')
     # TODO: Many fields may not be necessary for the frontend.
@@ -88,7 +88,9 @@ class InstanceCollection:
         """
         Return the instance with `exec_id` from workflow history.
         """
-        workflow = await self._workflows.find_one({'exec.id': exec_id}, {'_id': 0})
+        workflow = await self._workflows.find_one(
+            {'exec.id': exec_id}, {'_id': 0}
+        )
         if workflow:
             workflow['tasks'] = await self._get_wflow_tasks(exec_id, full)
         return workflow
@@ -97,28 +99,24 @@ class InstanceCollection:
         """
         Return the informations of one single executed task.
         """
-        task = await self._tasks.find_one({'exec.id': task_id}, {'_id': 0})
-
-        # Remove inputs and outputs if not needed.
-        if task and full is False:
-            for data in ('inputs', 'outputs'):
-                try:
-                    del task['exec'][data]
-                except KeyError:
-                    continue
-
-        return task
+        if full is False:
+            filters = {'_id': 0, 'exec.inputs': 0, 'exec.outputs': 0}
+        else:
+            filters = {'_id': 0}
+        return await self._tasks.find_one({'exec.id': task_id}, filters)
 
     async def get_task_data(self, task_id):
         """
-        Return the data of one executed task.
+        Return the data (inputs/outputs) of one executed task.
         """
-        task = await self._tasks.find_one({'exec.id': task_id}, {'_id': 0})
-        if task:
-            return {
-                'inputs': task['exec']['inputs'],
-                'outputs': task['exec']['outputs'],
-            }
+        task = await self._tasks.find_one(
+            {'exec.id': task_id},
+            {'_id': 0, 'exec.inputs': 1, 'exec.outputs': 1},
+        )
+        return {
+            'inputs': task['exec']['inputs'],
+            'outputs': task['exec']['outputs'],
+        } if task else None
 
     async def get(self, root=False, full=False, offset=None, limit=None,
                   since=None, state=None, search=None, order=None):
