@@ -208,9 +208,7 @@ class _WorkflowResource:
 
         async def exec_handler(event):
             # Publish the event's data if requested.
-            if events and event.data['type'] in events:
-                await self.nyuki.bus.publish(event.data, async_topic)
-            elif not events:
+            if not events or event.data['type'] in events:
                 await self.nyuki.bus.publish(event.data, async_topic)
             # If the workflow is in a final state, unregister
             if event.data['type'] in [
