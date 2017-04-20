@@ -192,7 +192,7 @@ class MqttBus(Service):
         await self.client.subscribe([(topic, QOS_1)])
 
         # Regexes are about topics like 'word/+/word' or 'word/#'
-        is_regex = '/+' in topic or topic.endswith('#')
+        is_regex = '+' in topic or topic.endswith('#')
         if is_regex is True:
             try:
                 self._regex_subscriptions[topic].callbacks.add(callback)
@@ -248,7 +248,7 @@ class MqttBus(Service):
         """
         Unsubscribe from a topic, remove callback if set.
         """
-        if '/+' in topic or topic.endswith('#'):
+        if '+' in topic or topic.endswith('#'):
             await self._unsub_regex(topic, callback)
         else:
             await self._unsub(topic, callback)
