@@ -92,12 +92,12 @@ class TriggerWorkflowTask(TaskHolder):
 
     async def async_exec(self, topic, data):
         log.debug(
-            "Received data for async trigger_workflow in '%s': %s", topic, data
+            "Received data for async trigger_workflow in '%s': %s",
+            topic, data,
         )
-        if data['type'] in [WorkflowExecState.end.value, WorkflowExecState.error.value]:
-            if not self.async_future.done():
-                self.async_future.set_result(data)
-            await runtime.bus.unsubscribe(topic)
+        if not self.async_future.done():
+            self.async_future.set_result(data)
+        await runtime.bus.unsubscribe(topic)
 
     async def execute(self, event):
         """
@@ -131,6 +131,10 @@ class TriggerWorkflowTask(TaskHolder):
         if self.blocking:
             topic = '{}/async/{}'.format(runtime.bus.name, str(uuid4())[:8])
             headers['X-Surycat-Async-Topic'] = topic
+            headers['X-Surycat-Async-Events'] = ','.join([
+                WorkflowExecState.end.value,
+                WorkflowExecState.error.value,
+            ])
             self.async_future = asyncio.Future()
             await runtime.bus.subscribe(topic, self.async_exec)
 
