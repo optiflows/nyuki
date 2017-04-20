@@ -78,9 +78,13 @@ class InstanceCollections:
         """
         Fetch the list of task execs for this workflow exec.
         """
+        if full is False:
+            filters = self.TASK_HISTORY_FILTERS
+        else:
+            filters = {'_id': 0, 'workflow_exec_id': 0}
         cursor = self._tasks.find(
             {'workflow_exec_id': workflow_exec_id},
-            self.TASK_HISTORY_FILTERS if full is False else {'_id': 0},
+            filters,
         )
         return await cursor.to_list(None)
 
@@ -177,12 +181,10 @@ class InstanceCollections:
         Insert a finished workflow report into the workflow history.
         """
         # Split tasks exec and workflow exec.
-        task_exec_ids = list()
         for task in workflow['tasks']:
             task['workflow_exec_id'] = workflow['exec']['id']
             await self._tasks.insert(task)
-            task_exec_ids.append(task['exec']['id'])
-        workflow['tasks'] = task_exec_ids
+        del workflow['tasks']
 
         try:
             await self._workflows.insert(workflow)
