@@ -317,7 +317,15 @@ class ApiWorkflows(_WorkflowResource):
         if async_topic is not None:
             self.register_async_handler(async_topic, async_events, wflow)
 
-        return Response(wfinst.report())
+        try:
+            # Wait up to 30 seconds for the workflow to start.
+            await asyncio.wait_for(wfinst.instance._committed.wait(), 30.0)
+        except asyncio.TimeoutError:
+            status = 201
+        else:
+            status = 200
+
+        return Response(wfinst.report(), status=status)
 
 
 @resource('/workflow/instances/{iid}', versions=['v1'])
