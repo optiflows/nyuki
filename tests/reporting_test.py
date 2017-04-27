@@ -41,14 +41,7 @@ class ReportingTest(TestCase):
             }
         })
 
-    async def test_002_check_send_report(self):
-        with assert_raises(ValidationError):
-            reporting.send_report('type', 'nope')
-        reporting.send_report('type', {'key': 'value'})
-        # Troubles patching datetime.utcnow
-        eq_(self.publisher.publish.call_count, 1)
-
-    async def test_003_exception(self):
+    async def test_002_exception(self):
         reporting.exception(Exception('nope'))
         # Troubles patching datetime.utcnow
         eq_(self.publisher.publish.call_count, 1)

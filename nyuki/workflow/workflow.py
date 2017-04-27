@@ -273,7 +273,7 @@ class WorkflowNyuki(Nyuki):
             'type': event.data['type'],
             'data': event.data.get('content') or {},
             'source': source,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.utcnow(),
         }
 
         memwrite = True

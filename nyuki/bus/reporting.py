@@ -148,10 +148,9 @@ class Reporter(object):
             ),
             'type': rtype,
             'author': self._name,
-            'datetime': datetime.utcnow().isoformat(),
+            'datetime': datetime.utcnow(),
             'data': data
         }
-        self.check_report(report)
         log.info("Sending report data with type '%s'", rtype)
         asyncio.ensure_future(self._publisher.publish(report, self._channel))
 
