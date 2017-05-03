@@ -1,15 +1,16 @@
+import re
 import asyncio
 import logging
-import re
 from enum import Enum
 from uuid import uuid4
-from datetime import datetime
 from aiohttp.web import FileField
 from tukio import get_broker, EXEC_TOPIC
 from tukio.utils import FutureState
 from tukio.workflow import WorkflowTemplate, WorkflowExecState
 from pymongo import DESCENDING, ASCENDING
 from pymongo.errors import AutoReconnect, DuplicateKeyError
+from datetime import datetime, timezone
+from bson.codec_options import CodecOptions
 
 from nyuki.utils import from_isoformat
 from nyuki.api import Response, resource, content_type
@@ -57,8 +58,14 @@ class InstanceCollections:
     }
 
     def __init__(self, db):
-        self._workflows = db['workflow-instances']
-        self._tasks = db['task-instances']
+        # Handle timezones in mongo collections.
+        # See http://api.mongodb.com/python/current/examples/datetimes.html#reading-time
+        self._workflows = db['workflow-instances'].with_options(
+            codec_options=CodecOptions(tz_aware=True, tzinfo=timezone.utc)
+        )
+        self._tasks = db['task-instances'].with_options(
+            codec_options=CodecOptions(tz_aware=True, tzinfo=timezone.utc)
+        )
         asyncio.ensure_future(self.index())
 
     async def index(self):
