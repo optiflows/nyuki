@@ -3,58 +3,12 @@ import sys
 import socket
 import asyncio
 import logging
-from functools import partial
-from datetime import datetime, timezone
 from traceback import TracebackException
-from jsonschema import FormatChecker, validate, ValidationError
 
 from nyuki.utils import from_isoformat, utcnow
 
 
 log = logging.getLogger(__name__)
-
-
-REPORT_SCHEMA = {
-    'type': 'object',
-    'required': ['hostname', 'ipv4', 'type', 'author', 'datetime', 'data'],
-    'properties': {
-        'hostname': {
-            'type': 'string',
-            'minLength': 1
-        },
-        'ipv4': {
-            'type': 'string',
-            'minLength': 1
-        },
-        'type': {
-            'type': 'string',
-            'minLength': 1
-        },
-        'author': {
-            'type': 'string',
-            'minLength': 1
-        },
-        'datetime': {
-            'type': 'string',
-            'format': 'isoformat'
-        },
-        'data': {'type': 'object'}
-    },
-    "additionalProperties": False
-}
-
-
-report_checker = FormatChecker()
-
-
-@report_checker.checks(format='isoformat')
-def _check_isoformat(datetime):
-    try:
-        from_isoformat(datetime)
-    except ValueError:
-        log.warning('Unknown datetime format: %s', datetime)
-        return False
-    return True
 
 
 class Reporter(object):
@@ -96,12 +50,6 @@ class Reporter(object):
             log.debug('Report received, no handler set')
             return
 
-        try:
-            self.check_report(data)
-        except ValidationError:
-            log.debug('Received invalid report format, ignoring')
-            return
-
         if data['author'] == self._name:
             log.debug('Received own report, ignoring')
             return
@@ -119,12 +67,6 @@ class Reporter(object):
                 self.MONIT_TOPIC, self._handle_report
             ))
         self._handler = handler
-
-    def check_report(self, report):
-        """
-        Raise ValidationError on failure
-        """
-        validate(report, REPORT_SCHEMA, format_checker=report_checker)
 
     def send_report(self, rtype, data):
         """

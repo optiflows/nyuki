@@ -139,7 +139,7 @@ class RaftProtocol(Service):
                     if resp.status != 200:
                         return
                     return await resp.json()
-        except (aiohttp.errors.ClientError, ConnectionError):
+        except (aiohttp.ClientError, ConnectionError):
             return
 
     async def start(self, *args, **kwargs):
