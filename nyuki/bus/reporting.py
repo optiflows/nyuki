@@ -1,14 +1,14 @@
-import asyncio
-from datetime import datetime
-from functools import partial
-from jsonschema import FormatChecker, validate, ValidationError
-import logging
 import os
-import socket
 import sys
+import socket
+import asyncio
+import logging
+from functools import partial
+from datetime import datetime, timezone
 from traceback import TracebackException
+from jsonschema import FormatChecker, validate, ValidationError
 
-from nyuki.utils import from_isoformat
+from nyuki.utils import from_isoformat, utcnow
 
 
 log = logging.getLogger(__name__)
@@ -148,7 +148,7 @@ class Reporter(object):
             ),
             'type': rtype,
             'author': self._name,
-            'datetime': datetime.utcnow(),
+            'datetime': utcnow(),
             'data': data
         }
         log.info("Sending report data with type '%s'", rtype)

@@ -1,8 +1,9 @@
-from asynctest import TestCase, CoroutineMock, ignore_loop, exhaust_callbacks
 from datetime import datetime
 from jsonschema import ValidationError
 from nose.tools import assert_raises, eq_, assert_true
+from asynctest import TestCase, CoroutineMock, ignore_loop, exhaust_callbacks
 
+from nyuki.utils import utcnow
 from nyuki.bus import reporting
 
 
@@ -34,7 +35,7 @@ class ReportingTest(TestCase):
             'hostname': 'nosetests',
             'type': 'something',
             'author': 'test',
-            'datetime': datetime.utcnow().isoformat(),
+            'datetime': utcnow(),
             'data': {
                 'address': 'test',
                 'traceback': 'test'

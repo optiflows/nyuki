@@ -6,15 +6,13 @@ import aiohttp
 from random import shuffle
 from datetime import datetime
 from tukio import Engine, TaskRegistry, get_broker, EXEC_TOPIC
-from tukio.workflow import (
-    TemplateGraphError, Workflow, WorkflowTemplate, WorkflowExecState
-)
+from tukio.workflow import Workflow, WorkflowTemplate, WorkflowExecState
 
 from nyuki import Nyuki
 from nyuki.bus import reporting
 from nyuki.websocket import WebsocketResource
 from nyuki.memory import memsafe
-from nyuki.utils import serialize_object
+from nyuki.utils import serialize_object, utcnow
 
 from .api.factory import (
     ApiFactoryRegex, ApiFactoryRegexes, ApiFactoryLookup, ApiFactoryLookups,
@@ -273,7 +271,7 @@ class WorkflowNyuki(Nyuki):
             'type': event.data['type'],
             'data': event.data.get('content') or {},
             'source': source,
-            'timestamp': datetime.utcnow(),
+            'timestamp': utcnow(),
         }
 
         memwrite = True

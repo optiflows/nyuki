@@ -1,7 +1,7 @@
 import asyncio
-from datetime import datetime
 import logging
 
+from nyuki.utils import utcnow
 from nyuki.bus import reporting
 from nyuki.bus.persistence.backend import PersistenceBackend
 from nyuki.bus.persistence.events import EventStatus
@@ -163,7 +163,7 @@ class BusPersistence(object):
         adding a 'created_at' key.
         """
         log.debug("New event stored with uid '%s'", event['id'])
-        event['created_at'] = datetime.utcnow()
+        event['created_at'] = utcnow()
         self._last_events.put(event)
 
     async def update(self, uid, status):

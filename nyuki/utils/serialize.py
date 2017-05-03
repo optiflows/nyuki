@@ -1,14 +1,5 @@
 from functools import singledispatch
-from datetime import datetime, tzinfo, timedelta
-
-
-class SimpleUTC(tzinfo):
-
-    def tzname(self):
-        return 'UTC'
-
-    def utcoffset(self, dt):
-        return timedelta(0)
+from datetime import datetime, timedelta
 
 
 @singledispatch
@@ -24,4 +15,4 @@ def _serialize_datetime(dt):
     """
     Datetime serializer.
     """
-    return dt.replace(tzinfo=SimpleUTC()).isoformat()
+    return dt.isoformat()
