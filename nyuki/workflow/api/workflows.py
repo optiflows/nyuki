@@ -55,6 +55,8 @@ class InstanceCollections:
         'exec.outputs.quorum': 1,
         'exec.reporting.status': 1,
         'exec.reporting.errors': 1,
+        # Twilio-specific error field
+        'exec.reporting.twilio_error': 1,
     }
 
     def __init__(self, db):
