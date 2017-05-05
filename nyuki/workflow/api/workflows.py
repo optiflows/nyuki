@@ -6,7 +6,9 @@ from uuid import uuid4
 from aiohttp.web import FileField
 from tukio import get_broker, EXEC_TOPIC
 from tukio.utils import FutureState
-from tukio.workflow import WorkflowTemplate, WorkflowExecState
+from tukio.workflow import (
+    WorkflowTemplate, WorkflowExecState, WorkflowRootTaskError
+)
 from pymongo import DESCENDING, ASCENDING
 from pymongo.errors import AutoReconnect, DuplicateKeyError
 from datetime import datetime, timezone
@@ -291,6 +293,13 @@ class ApiWorkflows(_WorkflowResource):
             })
 
         wf_tmpl = WorkflowTemplate.from_dict(templates[0])
+        try:
+            wf_tmpl.root()
+        except WorkflowRootTaskError:
+            return Response(status=400, body={
+                'error': 'More than one root task'
+            })
+
         if exec:
             wflow = await self.nyuki.engine.rescue(wf_tmpl, request)
         elif draft:
