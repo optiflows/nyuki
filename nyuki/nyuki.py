@@ -16,7 +16,6 @@ from .config import get_full_config, write_conf_json, merge_configs
 from .debugging import StackSampler, ApiSampleEmitter
 from .logs import DEFAULT_LOGGING
 from .services import ServiceManager
-from .websocket import WebsocketHandler
 from .discovery import Discovery
 from .raft import RaftProtocol, ApiRaft
 from .memory import Memory
@@ -98,9 +97,6 @@ class Nyuki:
                 self._services.add('bus', XmppBus(self))
             elif bus_service == 'mqtt':
                 self._services.add('bus', MqttBus(self))
-        # Add websocket server if in conf file
-        if self._config.get('websocket') is not None:
-            self._services.add('websocket', WebsocketHandler(self))
 
         # Add NaaS (nyuki-as-a-service) related services
         if self._config.get('service'):
