@@ -249,6 +249,7 @@ class WorkflowNyuki(Nyuki):
             'data': event.data.get('content') or {},
             'ts': utcnow(),
             'sub': topic,
+            'source': source,
         }
 
         memwrite = True

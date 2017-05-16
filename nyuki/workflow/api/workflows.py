@@ -240,10 +240,10 @@ class ApiWorkflows(_WorkflowResource):
         """
         Return workflow instances
         """
-        return Response(
+        return Response([
             workflow.report()
             for workflow in self.nyuki.running_workflows.values()
-        )
+        ])
 
     async def put(self, request):
         """
