@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import AutoReconnect, OperationFailure
@@ -26,16 +27,8 @@ class MongoBackend(PersistenceBackend):
         # Options
         self._options = kwargs
 
-    def __str__(self):
-        return "<MongoBackend with host '{}'>".format(self.host)
-
-    async def ping(self):
-        try:
-            await self.client.admin.command('ping')
-        except AutoReconnect:
-            return False
-        else:
-            return True
+    def __repr__(self):
+        return "<MongoBackend host='%s' col='%s'>".format(self.host, self.name)
 
     async def init(self):
         # Get collection for this nyuki
@@ -47,6 +40,7 @@ class MongoBackend(PersistenceBackend):
     async def _index_ttl(self):
         # Set a TTL to the documents in this collection
         async def index():
+            await self._collection.create_index('id')
             await self._collection.create_index(
                 'created_at', expireAfterSeconds=self.ttl
             )
@@ -57,36 +51,33 @@ class MongoBackend(PersistenceBackend):
             # Value changed, drop and reindex
             await self._collection.drop_index('created_at_1')
             await index()
+        except AutoReconnect:
+            log.error('Backend not available: %r', self)
 
         self._indexed = True
 
     async def store(self, event):
-        if not await self.ping():
-            raise MongoNotConnectedError
-
         if not self._indexed:
             await self._index_ttl()
 
-        await self._collection.insert(event)
+        try:
+            await self._collection.insert(event)
+        except AutoReconnect:
+            log.error('Backend not available: %r', self)
 
     async def update(self, uid, status):
-        if not await self.ping():
-            raise MongoNotConnectedError
-
-        await self._collection.update(
-            {'id': uid},
-            {'$set': {'status': status.value}}
-        )
+        try:
+            await self._collection.update(
+                {'id': uid},
+                {'$set': {'status': status.value}}
+            )
+        except AutoReconnect:
+            log.error('Backend not available: %r', self)
 
     async def retrieve(self, since=None, status=None):
-        if not await self.ping():
-            raise MongoNotConnectedError
-
         query = {}
-
         if since:
             query['created_at'] = {'$gte': since}
-
         if status:
             if isinstance(status, list):
                 query['status'] = {'$in': [es.value for es in status]}
@@ -96,4 +87,7 @@ class MongoBackend(PersistenceBackend):
         cursor = self._collection.find(query)
         cursor.sort('created_at')
 
-        return await cursor.to_list(None)
+        try:
+            return await cursor.to_list(None)
+        except AutoReconnect:
+            log.error('Backend not available: %r', self)

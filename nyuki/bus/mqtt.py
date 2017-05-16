@@ -45,11 +45,12 @@ class MqttBus(Service):
                     'port': {'type': 'integer'},
                     'persistence': {
                         'type': 'object',
+                        'required': ['backend'],
                         'properties': {
-                            'backend': {
-                                'type': 'string',
-                                'minLength': 1
-                            }
+                            'backend': {'type': 'string', 'enum': [
+                                'memory',
+                                'mongo',
+                            ]}
                         }
                     },
                     'scheme': {
@@ -67,6 +68,7 @@ class MqttBus(Service):
 
     def __init__(self, nyuki, loop=None):
         self._nyuki = nyuki
+        nyuki.register_schema(self.CONF_SCHEMA)
         self._loop = loop or asyncio.get_event_loop()
         self._host = None
         self.client = None
@@ -107,8 +109,11 @@ class MqttBus(Service):
         )
 
         # Persistence storage
-        self._persistence = BusPersistence(name=name, **persistence)
-        log.info('Bus persistence set to %s', self._persistence.backend)
+        if persistence:
+            self._persistence = BusPersistence(name=name, **persistence)
+            log.info('Bus persistence set to %s', self._persistence.backend)
+        else:
+            self._persistence = None
 
     async def start(self):
         def cancelled(future):
@@ -119,13 +124,8 @@ class MqttBus(Service):
         self.connect_future = asyncio.ensure_future(self._run())
         self.connect_future.add_done_callback(cancelled)
 
-        try:
+        if self._persistence:
             await self._persistence.init()
-        except PersistenceError:
-            log.error(
-                'Could not init persistence storage with %s',
-                self._persistence.backend
-            )
 
     async def stop(self):
         # Clean client
@@ -143,7 +143,6 @@ class MqttBus(Service):
         if self.listen_future:
             log.debug('cancelling _listen coroutine')
             self.listen_future.cancel()
-        await self._persistence.close()
         log.info('MQTT service stopped')
 
     def init_reporting(self):
@@ -164,6 +163,9 @@ class MqttBus(Service):
         """
         Replay events since the given datetime (or all if None)
         """
+        if not self._persistence:
+            return
+
         msg = 'Replaying events'
         if since:
             msg += ' since {}'.format(since)
@@ -273,30 +275,30 @@ class MqttBus(Service):
         log.debug('dump: %s', data)
         data = json.dumps(data, default=serialize_object)
 
-        # Store the event as PENDING if it is new
-        if self._persistence and previous_uid is None:
-            await self._persistence.store({
-                'id': uid,
-                'status': EventStatus.PENDING.value,
-                'topic': topic,
-                'message': data,
-            })
-            if self._persistence.memory_buffer.is_full:
-                asyncio.ensure_future(self._nyuki.on_buffer_full(
-                    self._persistence.memory_buffer.free_slot
-                ))
-
         if self.client._connected_state.is_set():
-            # Implies QOS_0
-            await self.client.publish(topic, data.encode())
-            status = EventStatus.SENT
-            log.debug('Event successfully sent to topic %s', topic)
+            try:
+                await self.client.publish(topic, data.encode())
+            except Exception as exc:
+                status = EventStatus.PENDING
+                log.error('Error while publishing: %s', exc)
+            else:
+                status = EventStatus.SENT
+                log.debug('Event successfully sent to topic %s', topic)
         else:
             status = EventStatus.FAILED
             log.error('Failed to send event to topic %s', topic)
 
         if self._persistence:
-            await self._persistence.update(previous_uid or uid, status)
+            if previous_uid is None:
+                # This event was not previously sent
+                await self._persistence.store({
+                    'id': uid,
+                    'status': status.value,
+                    'topic': topic,
+                    'message': data,
+                })
+            else:
+                await self._persistence.update(previous_uid or uid, status)
 
     async def _run(self):
         """

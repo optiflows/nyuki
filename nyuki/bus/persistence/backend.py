@@ -8,10 +8,10 @@ class PersistenceBackend(object):
     async def init(self):
         pass
 
-    async def ping(self):
-        return True
-
     async def store(self, event):
+        raise NotImplementedError
+
+    async def update(self, uid, status):
         raise NotImplementedError
 
     async def retrieve(self, since, status):
