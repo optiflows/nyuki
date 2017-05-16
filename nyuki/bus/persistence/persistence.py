@@ -16,7 +16,7 @@ class PersistenceError(Exception):
     pass
 
 
-class BusPersistence(object):
+class BusPersistence:
 
     """
     This module will enable local caching for bus events to replace the

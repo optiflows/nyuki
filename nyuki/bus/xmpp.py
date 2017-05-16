@@ -172,8 +172,11 @@ class XmppBus(Service):
         )
 
         # Persistence storage
-        self._persistence = BusPersistence(name=self.name, **persistence)
-        log.info('Bus persistence set to %s', self._persistence.backend)
+        if persistence:
+            self._persistence = BusPersistence(name=self.name, **persistence)
+            log.info('Bus persistence set to %s', self._persistence.backend)
+        else:
+            self._persistence = None
 
     async def stop(self):
         if not self.client:
@@ -190,8 +193,6 @@ class XmppBus(Service):
             await asyncio.wait_for(self.client.disconnected, 2.0)
         except asyncio.TimeoutError:
             log.error('Could not end bus connection after 2 seconds')
-
-        await self._persistence.close()
 
     def init_reporting(self):
         """
@@ -386,11 +387,6 @@ class XmppBus(Service):
                 'topic': topic or self.name,
                 'message': msg['body'],
             })
-            in_memory = self._persistence.memory_buffer
-            if in_memory.is_full:
-                asyncio.ensure_future(self._nyuki.on_buffer_full(
-                    in_memory.free_slot
-                ))
 
         # Publish in MUC
         if self._connected.is_set():

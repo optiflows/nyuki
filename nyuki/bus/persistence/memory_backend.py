@@ -45,7 +45,7 @@ class MemoryBackend(PersistenceBackend):
         self._last_events = FIFOSizedQueue(max_size)
 
     def __repr__(self):
-        return '<MemoryBackend max_size=%d>'.format(self._last_events.size)
+        return '<MemoryBackend max_size={}>'.format(self._last_events.size)
 
     async def store(self, event):
         self._last_events.put(event)

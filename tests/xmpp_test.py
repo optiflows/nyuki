@@ -7,6 +7,7 @@ from slixmpp import JID
 
 from nyuki.bus.xmpp import _XmppClient, XmppBus
 from nyuki.bus.persistence import EventStatus
+from nyuki.bus.persistence.memory_backend import MemoryBackend
 
 
 class TestBusClient(TestCase):
@@ -148,35 +149,16 @@ class TestXmppBus(TestCase):
         submock.assert_called_once_with('test', None)
 
 
-class FakePersistenceBackend(object):
-
-    def __init__(self):
-        self.events = list()
-
-    async def ping(self):
-        return True
-
-    async def init(self):
-        pass
-
-    async def store(self, event):
-        self.events.append(event)
-
-    async def retrieve(self, since, status):
-        return self.events.copy()
-
-
-class TestMongoPersistence(TestCase):
+class TestPersistence(TestCase):
 
     @patch('nyuki.bus.persistence.mongo_backend.MongoBackend.init')
     async def setUp(self, init):
         self.bus = XmppBus(Mock())
         self.bus.configure(
             'test@localhost', 'password',
-            persistence={'backend': 'mongo'}
+            persistence={'backend': 'memory'}
         )
-        self.backend = FakePersistenceBackend()
-        self.bus._persistence.backend = self.backend
+        self.backend = self.bus._persistence.backend
 
     @patch('slixmpp.xmlstream.stanzabase.StanzaBase.send', Mock)
     async def test_001_store_replay(self):
@@ -184,13 +166,12 @@ class TestMongoPersistence(TestCase):
         await self.bus.publish({'another': 'event'})
 
         # Backend received the events
-        await self.bus._persistence._empty_last_events()
-        eq_(len(self.backend.events), 2)
-        eq_(self.backend.events[0]['status'], EventStatus.FAILED.value)
+        eq_(len(self.backend._last_events), 2)
+        eq_(self.backend._last_events.list[0]['status'], EventStatus.FAILED.value)
 
         # Check replay send the same event
-        event_0_uid = self.backend.events[0]['id']
-        event_1_uid = self.backend.events[1]['id']
+        event_0_uid = self.backend._last_events.list[0]['id']
+        event_1_uid = self.backend._last_events.list[1]['id']
         with patch.object(self.bus, 'publish') as pub:
             await self.bus.replay()
             pub.assert_has_calls([
@@ -198,27 +179,14 @@ class TestMongoPersistence(TestCase):
                 call({'another': 'event'}, topic='test', previous_uid=event_1_uid),
             ])
 
-    def finish_publishments(self, fail=False):
+    def finish_publications(self):
         for future in self.bus._publish_futures.values():
             future.set_result(None)
 
     @patch('slixmpp.xmlstream.stanzabase.StanzaBase.send', Mock)
     async def test_002_store_xmpp_connected(self):
         self.bus._connected.set()
-        self.loop.call_later(0.1, self.finish_publishments)
+        self.loop.call_later(0.1, self.finish_publications)
         await self.bus.publish({'something': 'something'})
-        await self.bus._persistence._empty_last_events()
-        eq_(len(self.backend.events), 1)
-        eq_(self.backend.events[0]['status'], EventStatus.SENT.value)
-
-    @patch('slixmpp.xmlstream.stanzabase.StanzaBase.send', Mock)
-    async def test_003_in_memory(self):
-        await self.bus.publish({'something': 'something'})
-        await self.bus.publish({'another': 'event'})
-        eq_(len(self.bus._persistence._last_events), 2)
-        eq_(len(self.backend.events), 0)
-
-        # Empty to DB
-        await self.bus._persistence._empty_last_events()
-        eq_(len(self.bus._persistence._last_events), 0)
-        eq_(len(self.backend.events), 2)
+        eq_(len(self.backend._last_events), 1)
+        eq_(self.backend._last_events.list[0]['status'], EventStatus.SENT.value)

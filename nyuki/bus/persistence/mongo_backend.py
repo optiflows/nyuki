@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import AutoReconnect, OperationFailure
@@ -28,7 +27,7 @@ class MongoBackend(PersistenceBackend):
         self._options = kwargs
 
     def __repr__(self):
-        return "<MongoBackend host='%s' col='%s'>".format(self.host, self.name)
+        return "<MongoBackend host='{}' col='{}'>".format(self.host, self.name)
 
     async def init(self):
         # Get collection for this nyuki
