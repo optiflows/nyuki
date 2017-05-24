@@ -398,20 +398,6 @@ class ApiWorkflow(_WorkflowResource):
             return Response(status=404)
 
 
-# @resource('/workflow/instances/{iid}/tasks/{tid}', versions=['v1'])
-# class ApiWorkflowqsd(_WorkflowResource):
-
-#     async def get(self, request, iid, tid):
-#         """
-#         Return a workflow instance
-#         """
-#         try:
-#             workflow = self.nyuki.running_workflows[iid].report()
-#             return Response(workflow['tasks'][tid])
-#         except KeyError:
-#             return Response(status=404)
-
-
 @resource('/workflow/history', versions=['v1'])
 class ApiWorkflowsHistory:
 

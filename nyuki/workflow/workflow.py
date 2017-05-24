@@ -73,6 +73,8 @@ class WorkflowInstance:
     Allows retrieving a workflow exec state at any moment.
     """
 
+    __slots__ = ('_template', '_instance', '_exec')
+
     ALLOWED_EXEC_KEYS = ['requester', 'track']
 
     def __init__(self, template, instance, **kwargs):
