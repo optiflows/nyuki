@@ -347,14 +347,16 @@ class ApiWorkflows(_WorkflowResource):
 
 
 @resource('/workflow/instances/{iid}', versions=['v1'])
-class ApiWorkflow(_WorkflowResource):
+class ApiWorkflow:
 
     async def get(self, request, iid):
         """
         Return a workflow instance
         """
         try:
-            return Response(self.nyuki.running_workflows[iid].report())
+            return Response(self.nyuki.running_workflows[iid].report(
+                reporting=False, data=False
+            ))
         except KeyError:
             return Response(status=404)
 
@@ -394,6 +396,34 @@ class ApiWorkflow(_WorkflowResource):
         """
         try:
             self.nyuki.running_workflows[iid].instance.cancel()
+        except KeyError:
+            return Response(status=404)
+
+
+@resource('/workflow/instances/{iid}/tasks/{tid}', versions=['v1'])
+class ApiTask:
+
+    async def get(self, request, iid, tid):
+        """
+        Return a workflow instance
+        """
+        try:
+            workflow = self.nyuki.running_workflows[iid].report(reporting=False)
+            return Response(workflow['tasks'][tid])
+        except KeyError:
+            return Response(status=404)
+
+
+@resource('/workflow/instances/{iid}/tasks/{tid}/reporting', versions=['v1'])
+class ApiTaskReporting:
+
+    async def get(self, request, iid, tid):
+        """
+        Return a workflow instance
+        """
+        try:
+            workflow = self.nyuki.running_workflows[iid].report(data=False)
+            return Response(workflow['tasks'][tid]['exec']['reporting'])
         except KeyError:
             return Response(status=404)
 

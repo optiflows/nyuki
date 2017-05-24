@@ -98,7 +98,7 @@ class WorkflowInstance:
     def exec(self):
         return self._exec
 
-    def report(self, tasks=True):
+    def report(self, tasks=True, reporting=True, data=True):
         """
         Merge a workflow exec instance report and its template.
         """
@@ -114,14 +114,21 @@ class WorkflowInstance:
         if tasks is False:
             del result['graph']
             del result['tasks']
-        else:
-            tasks = {task['id']: task for task in template['tasks']}
-            for task in inst['tasks']:
-                # Stored template contains more info than tukio's (title...),
-                # so we add it to the report.
-                tasks[task['id']] = {**tasks[task['id']], **task}
-            result['tasks'] = [task for task in tasks.values()]
+            return result
 
+        tasks = {task['id']: task for task in template['tasks']}
+        for task in inst['tasks']:
+            # Filter out reporting/data if not necessary
+            if task.get('exec'):
+                if reporting is False:
+                    task['exec']['reporting'] = None
+                if data is False:
+                    task['exec']['inputs'] = None
+                    task['exec']['outputs'] = None
+            # Stored template contains more info than tukio's (title...),
+            # so we add it to the report.
+            tasks[task['id']] = {**tasks[task['id']], **task}
+        result['tasks'] = [task for task in tasks.values()]
         return result
 
 
@@ -243,18 +250,28 @@ class WorkflowNyuki(Nyuki):
         exec_id = source['workflow_exec_id']
         wflow = self.running_workflows[exec_id]
         source['workflow_exec_requester'] = wflow.exec.get('requester')
-
-        # TODO: split into multiple topics depending on the source
-        topic = 'workflow/{}'.format(exec_id)
-        source['service'] = self.bus.name
+        topic = 'workflow/exec/{}'.format(exec_id)
 
         payload = {
             'type': event.data['type'],
             'data': event.data.get('content') or {},
             'ts': utcnow(),
             'topic': topic,
-            'source': source,
+            'source': {
+                'workflow_exec_id': exec_id,
+                'service': self.bus.name,
+            }
         }
+
+        # A task information requires the corresponding template_id
+        # and a more precise topic.
+        task_exec_id = source.get('task_exec_id')
+        if task_exec_id:
+            topic = '{}/tasks/{}'.format(topic, task_exec_id)
+            if event.data['type'] == TaskExecState.progress.value:
+                topic = '{}/reporting'.format(topic)
+            payload['topic'] = topic
+            payload['source']['task_template_id'] = source.get('task_template_id')
 
         memwrite = True
         # Workflow begins, also send the full template.
@@ -280,7 +297,9 @@ class WorkflowNyuki(Nyuki):
                 memjob = self.clear_report(exec_id)
             asyncio.ensure_future(memjob)
 
-        asyncio.ensure_future(self.bus.publish(payload, 'websocket/' + topic))
+        asyncio.ensure_future(self.bus.publish(
+            payload, 'websocket/{}'.format(topic)
+        ))
 
     async def workflow_event(self, efrom, data):
         """
