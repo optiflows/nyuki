@@ -98,7 +98,7 @@ class WorkflowInstance:
     def exec(self):
         return self._exec
 
-    def report(self, full=True):
+    def report(self, tasks=True):
         """
         Merge a workflow exec instance report and its template.
         """
@@ -111,8 +111,9 @@ class WorkflowInstance:
             'exec': inst['exec'],
         }
 
-        if full is False:
+        if tasks is False:
             del result['graph']
+            del result['tasks']
         else:
             tasks = {task['id']: task for task in template['tasks']}
             for task in inst['tasks']:

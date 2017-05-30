@@ -241,7 +241,7 @@ class ApiWorkflows(_WorkflowResource):
         Return workflow instances
         """
         return Response([
-            workflow.report()
+            workflow.report(tasks=request.GET.get('tasks', '0') == '1')
             for workflow in self.nyuki.running_workflows.values()
         ])
 
