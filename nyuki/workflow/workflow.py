@@ -246,12 +246,13 @@ class WorkflowNyuki(Nyuki):
 
         # TODO: split into multiple topics depending on the source
         topic = 'workflow/{}'.format(exec_id)
+        source['service'] = self.bus.name
 
         payload = {
             'type': event.data['type'],
             'data': event.data.get('content') or {},
             'ts': utcnow(),
-            'sub': topic,
+            'topic': topic,
             'source': source,
         }
 
