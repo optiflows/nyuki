@@ -48,21 +48,22 @@ class ServiceManager(object):
     def get(self, name):
         return self.services[name]
 
-    async def start(self, timeout=5):
+    async def start(self):
         """
-        Start all services with the given timeout
+        Start all services
         """
         tasks = [
             asyncio.ensure_future(service.start())
             for service in self.services.values()
         ]
 
+        # Start all services, raise any exception
+        log.info('Starting services: %s', ', '.join(self.services.keys()))
         log.debug('Running start tasks : %s', tasks)
-        done, not_done = await asyncio.wait(tasks, timeout=timeout)
-        if not_done:
-            raise asyncio.TimeoutError(
-                'Start tasks {} did not finish'.format(not_done)
-            )
+        done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+        for f in done:
+            f.result()
+
         self._running = True
         log.debug('Start tasks done')
 

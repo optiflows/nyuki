@@ -50,7 +50,9 @@ class MqttBus(Service):
                             'backend': {'type': 'string', 'enum': [
                                 'memory',
                                 'mongo',
-                            ]}
+                            ]},
+                            'host': {'type': 'string'},
+                            'ttl': {'type': 'number'},
                         },
                     },
                     'scheme': {
@@ -116,6 +118,9 @@ class MqttBus(Service):
             self._persistence = None
 
     async def start(self):
+        if self._persistence:
+            await self._persistence.init()
+
         def cancelled(future):
             try:
                 future.result()
@@ -123,9 +128,6 @@ class MqttBus(Service):
                 log.debug('future cancelled: %s', future)
         self.connect_future = asyncio.ensure_future(self._run())
         self.connect_future.add_done_callback(cancelled)
-
-        if self._persistence:
-            await self._persistence.init()
 
     async def stop(self):
         # Clean client

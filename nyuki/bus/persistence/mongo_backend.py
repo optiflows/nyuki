@@ -1,6 +1,8 @@
 import logging
 from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo.errors import AutoReconnect, OperationFailure
+from pymongo.errors import (
+    AutoReconnect, OperationFailure, ServerSelectionTimeoutError
+)
 
 from nyuki.bus.persistence.backend import PersistenceBackend
 
@@ -21,8 +23,6 @@ class MongoBackend(PersistenceBackend):
         self.host = host
         self.ttl = ttl
         self._collection = None
-        # Ensure TTL is set
-        self._indexed = False
         # Options
         self._options = kwargs
 
@@ -44,21 +44,18 @@ class MongoBackend(PersistenceBackend):
                 'created_at', expireAfterSeconds=self.ttl
             )
 
+        log.info('Indexation of mongo fields')
         try:
             await index()
         except OperationFailure:
             # Value changed, drop and reindex
             await self._collection.drop_index('created_at_1')
             await index()
-        except AutoReconnect:
-            log.error('Backend not available: %r', self)
-
-        self._indexed = True
+        except ServerSelectionTimeoutError:
+            log.error('Could not index mongo fields')
+            raise
 
     async def store(self, event):
-        if not self._indexed:
-            await self._index_ttl()
-
         try:
             await self._collection.insert(event)
         except AutoReconnect:

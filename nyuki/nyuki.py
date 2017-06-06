@@ -177,9 +177,8 @@ class Nyuki:
         # Start services
         try:
             self.loop.run_until_complete(self._services.start())
-        except asyncio.TimeoutError as exc:
-            log.error('Could not start services before timeout')
-            log.debug(exc)
+        except Exception as exc:
+            log.error(exc)
             return
 
         if 'bus' in self._services:
