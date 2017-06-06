@@ -11,7 +11,7 @@ from uuid import uuid4
 from nyuki.bus import reporting
 from nyuki.services import Service
 from nyuki.utils import serialize_object
-from .persistence import BusPersistence, EventStatus, PersistenceError
+from .persistence import BusPersistence, EventStatus
 
 
 log = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class MqttBus(Service):
                                 'memory',
                                 'mongo',
                             ]}
-                        }
+                        },
                     },
                     'scheme': {
                         'type': 'string',
@@ -298,7 +298,7 @@ class MqttBus(Service):
                     'message': data,
                 })
             else:
-                await self._persistence.update(previous_uid or uid, status)
+                await self._persistence.update(uid, status)
 
     async def _run(self):
         """
