@@ -21,10 +21,14 @@ class SleepTask(TaskHolder):
         }
     }
 
+    def comments(self):
+        return {'quorum': True}
+
     async def execute(self, event):
         task = asyncio.Task.current_task()
         time = self.config.get('time', 2)
         log.info('%s: sleeping %s second%s', task.uid, time, 's' if time > 1 else '')
         await asyncio.sleep(time)
+        task.dispatch_progress({'yo': 'lol'})
         log.info('%s: done sleeping', task.uid)
         return event.data

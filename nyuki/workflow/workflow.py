@@ -121,10 +121,10 @@ class WorkflowInstance:
             # Filter out reporting/data if not necessary
             if task.get('exec'):
                 if reporting is False:
-                    task['exec']['reporting'] = None
+                    del task['exec']['reporting']
                 if data is False:
-                    task['exec']['inputs'] = None
-                    task['exec']['outputs'] = None
+                    del task['exec']['inputs']
+                    del task['exec']['outputs']
             # Stored template contains more info than tukio's (title...),
             # so we add it to the report.
             tasks[task['id']] = {**tasks[task['id']], **task}
@@ -249,12 +249,10 @@ class WorkflowNyuki(Nyuki):
         source = event.source.as_dict()
         exec_id = source['workflow_exec_id']
         wflow = self.running_workflows[exec_id]
-        source['workflow_exec_requester'] = wflow.exec.get('requester')
         topic = 'workflow/exec/{}'.format(exec_id)
 
         payload = {
             'type': event.data['type'],
-            'data': event.data.get('content') or {},
             'ts': utcnow(),
             'topic': topic,
             'source': {
@@ -263,15 +261,30 @@ class WorkflowNyuki(Nyuki):
             }
         }
 
+        # The requester is required for the frontend
+        requester = wflow.exec.get('requester')
+        if requester:
+            payload['source']['workflow_exec_requester'] = requester
+
         # A task information requires the corresponding template_id
         # and a more precise topic.
         task_exec_id = source.get('task_exec_id')
         if task_exec_id:
             topic = '{}/tasks/{}'.format(topic, task_exec_id)
+
             if event.data['type'] == TaskExecState.progress.value:
+                # Only append full data if this is a 'task-progress'
+                payload['data'] = event.data.get('content') or {}
                 topic = '{}/reporting'.format(topic)
+
+            elif event.data['type'] == TaskExecState.end.value:
+                # Add the task's comments, if any (quorom, status...)
+                payload['data'] = event.data['content'].get('__comments__')
+
+            # Update topic for this event
             payload['topic'] = topic
-            payload['source']['task_template_id'] = source.get('task_template_id')
+            # Add the task template id corresponding to the event
+            payload['source']['task_template_id'] = source['task_template_id']
 
         memwrite = True
         # Workflow begins, also send the full template.

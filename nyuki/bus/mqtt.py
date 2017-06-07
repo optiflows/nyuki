@@ -1,12 +1,13 @@
-import asyncio
-import json
-import logging
 import re
+import json
+import asyncio
+import logging
+from copy import copy
+from uuid import uuid4
 from collections import namedtuple
 from hbmqtt.client import MQTTClient, ConnectException, ClientException
 from hbmqtt.errors import NoDataException
 from hbmqtt.mqtt.constants import QOS_1
-from uuid import uuid4
 
 from nyuki.bus import reporting
 from nyuki.services import Service
@@ -79,6 +80,8 @@ class MqttBus(Service):
         self._subscriptions = {}
         self._regex_subscriptions = {}
 
+        # Will call mqtt callbacks with dicts
+        self._raw = False
         # Coroutines
         self.connect_future = None
         self.listen_future = None
@@ -146,6 +149,12 @@ class MqttBus(Service):
             log.debug('cancelling _listen coroutine')
             self.listen_future.cancel()
         log.info('MQTT service stopped')
+
+    def receive_raw_data(self):
+        """
+        Start calling mqtt callbacks with data strings
+        """
+        self._raw = True
 
     def init_reporting(self):
         """
@@ -348,18 +357,21 @@ class MqttBus(Service):
                 break
 
             topic = message.topic
-            data = json.loads(message.data.decode())
+            if self._raw is False:
+                data = json.loads(message.data.decode())
+            else:
+                data = message.data.decode()
 
             # Iterate and call all regex topics callbacks
             for mqttregex in self._regex_subscriptions.values():
                 if mqttregex.regex.match(topic):
                     log.debug("Event from topic '%s': %s", topic, data)
                     for callback in mqttregex.callbacks:
-                        asyncio.ensure_future(callback(topic, data.copy()))
+                        asyncio.ensure_future(callback(topic, copy(data)))
 
             try:
                 # Iterate and call all single topic callbacks
                 for callback in self._subscriptions[topic]:
-                    asyncio.ensure_future(callback(topic, data.copy()))
+                    asyncio.ensure_future(callback(topic, copy(data)))
             except KeyError:
                 pass

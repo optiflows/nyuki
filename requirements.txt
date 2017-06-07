@@ -8,4 +8,4 @@ pijon>=0.1,<0.2
 # pycares-2.0.0 breaks errno.ECONNRESET
 # pycares==1.0.0
 slixmpp>=1.2,<1.3
-tukio>=0.13,<0.14
+-e git://github.com/optiflows/tukio.git@NYWS-2-topic-system#egg=tukio
