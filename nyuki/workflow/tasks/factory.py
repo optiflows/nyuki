@@ -128,6 +128,9 @@ class FactoryTask(TaskHolder):
             runtime.config['api']['port']
         )
 
+    def comments(self):
+        return {'errors': self._diff.get('errors', False)}
+
     def report(self):
         return self._diff
 
