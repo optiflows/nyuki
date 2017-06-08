@@ -254,22 +254,28 @@ class WorkflowNyuki(Nyuki):
             'type': event.data['type'],
             'ts': utcnow(),
             'topic': topic,
-            'source': {
-                'workflow_exec_id': exec_id,
-                'service': self.bus.name,
+            'service': self.bus.name,
+            'workflow': {
+                'exec_id': exec_id,
+                'template_id': source['workflow_template_id'],
             }
         }
 
         # The requester is required for the frontend
         requester = wflow.exec.get('requester')
         if requester:
-            payload['source']['workflow_exec_requester'] = requester
+            payload['workflow']['workflow_exec_requester'] = requester
 
         # A task information requires the corresponding template_id
         # and a more precise topic.
         task_exec_id = source.get('task_exec_id')
         if task_exec_id:
             topic = '{}/tasks/{}'.format(topic, task_exec_id)
+            # Add task source ids
+            payload['workflow']['task'] = {
+                'exec_id': source['task_exec_id'],
+                'template_id': source['task_template_id'],
+            }
 
             if event.data['type'] == TaskExecState.progress.value:
                 # Only append full data if this is a 'task-progress'
@@ -278,12 +284,10 @@ class WorkflowNyuki(Nyuki):
 
             elif event.data['type'] == TaskExecState.end.value:
                 # Add the task's comments, if any (quorom, status...)
-                payload['data'] = event.data['content'].get('__comments__')
+                payload['data'] = event.data['content'].get('__comments__') or {}
 
             # Update topic for this event
             payload['topic'] = topic
-            # Add the task template id corresponding to the event
-            payload['source']['task_template_id'] = source['task_template_id']
 
         memwrite = True
         # Workflow begins, also send the full template.

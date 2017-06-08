@@ -404,7 +404,7 @@ class ApiTaskReporting:
             workflow = self.nyuki.running_workflows[iid].instance.report()
             for task in workflow['tasks']:
                 if task['exec'] and task['exec']['id'] == tid:
-                    return Response(task['exec']['reporting'])
+                    return Response(task['exec'].get('reporting') or {})
             else:
                 raise KeyError
         except KeyError:
