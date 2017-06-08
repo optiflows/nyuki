@@ -24,7 +24,7 @@ from .api.templates import (
 from .api.workflows import (
     ApiWorkflow, ApiWorkflows, ApiWorkflowsHistory, ApiWorkflowHistory,
     ApiWorkflowTriggers, ApiWorkflowTrigger, ApiWorkflowHistoryTask,
-    ApiWorkflowHistoryTaskData,
+    ApiWorkflowHistoryTaskData, ApiTaskReporting,
 )
 from .api.vars import (
     ApiVars, ApiVarsVersion, ApiVarsDraft
@@ -98,7 +98,7 @@ class WorkflowInstance:
     def exec(self):
         return self._exec
 
-    def report(self, tasks=True, reporting=True, data=True):
+    def report(self, tasks=True, data=True):
         """
         Merge a workflow exec instance report and its template.
         """
@@ -119,12 +119,10 @@ class WorkflowInstance:
         tasks = {task['id']: task for task in template['tasks']}
         for task in inst['tasks']:
             # Filter out reporting/data if not necessary
-            if task.get('exec'):
-                if reporting is False:
-                    del task['exec']['reporting']
-                if data is False:
-                    del task['exec']['inputs']
-                    del task['exec']['outputs']
+            if task.get('exec') and data is False:
+                del task['exec']['reporting']
+                del task['exec']['inputs']
+                del task['exec']['outputs']
             # Stored template contains more info than tukio's (title...),
             # so we add it to the report.
             tasks[task['id']] = {**tasks[task['id']], **task}
@@ -164,8 +162,9 @@ class WorkflowNyuki(Nyuki):
         ApiTemplate,  # /v1/workflows/templates/{uid}
         ApiTemplateDraft,  # /v1/workflows/templates/{uid}/draft
         ApiTemplateVersion,  # /v1/workflows/templates/{uid}/{version}
-        ApiWorkflows,  # /v1/workflows
-        ApiWorkflow,  # /v1/workflows/{uid}
+        ApiWorkflows,  # /v1/workflow/instances
+        ApiWorkflow,  # /v1/workflow/instances/{uid}
+        ApiTaskReporting,  # /v1/workflow/instances/{uid}/tasks/{task_id}/reporting
         ApiWorkflowsHistory,  # /v1/workflows/history
         ApiWorkflowHistory,  # /v1/workflows/history/{uid}
         ApiWorkflowHistoryTask,  # /v1/workflows/history/{uid}/tasks/{task_id}

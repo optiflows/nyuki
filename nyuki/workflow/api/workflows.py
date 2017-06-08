@@ -39,7 +39,6 @@ class Ordering(Enum):
 class InstanceCollections:
 
     REQUESTER_REGEX = re.compile(r'^nyuki://.*')
-    # TODO: Many fields may not be necessary for the frontend.
     TASK_HISTORY_FILTERS = {
         '_id': 0,
         # Tasks
@@ -54,11 +53,7 @@ class InstanceCollections:
         'exec.end': 1,
         'exec.state': 1,
         # Graph-specific data fields
-        'exec.outputs.quorum': 1,
-        'exec.reporting.status': 1,
-        'exec.reporting.errors': 1,
-        # Twilio-specific error field
-        'exec.reporting.twilio_error': 1,
+        'exec.comments': 1,
     }
 
     def __init__(self, db):
@@ -354,9 +349,7 @@ class ApiWorkflow:
         Return a workflow instance
         """
         try:
-            return Response(self.nyuki.running_workflows[iid].report(
-                reporting=False, data=False
-            ))
+            return Response(self.nyuki.running_workflows[iid].report(data=False))
         except KeyError:
             return Response(status=404)
 
@@ -400,30 +393,20 @@ class ApiWorkflow:
             return Response(status=404)
 
 
-@resource('/workflow/instances/{iid}/tasks/{tid}', versions=['v1'])
-class ApiTask:
-
-    async def get(self, request, iid, tid):
-        """
-        Return a workflow instance
-        """
-        try:
-            workflow = self.nyuki.running_workflows[iid].report(reporting=False)
-            return Response(workflow['tasks'][tid])
-        except KeyError:
-            return Response(status=404)
-
-
 @resource('/workflow/instances/{iid}/tasks/{tid}/reporting', versions=['v1'])
 class ApiTaskReporting:
 
     async def get(self, request, iid, tid):
         """
-        Return a workflow instance
+        Return all the current reporting data for this task.
         """
         try:
-            workflow = self.nyuki.running_workflows[iid].report(data=False)
-            return Response(workflow['tasks'][tid]['exec']['reporting'])
+            workflow = self.nyuki.running_workflows[iid].instance.report()
+            for task in workflow['tasks']:
+                if task['exec'] and task['exec']['id'] == tid:
+                    return Response(task['exec']['reporting'])
+            else:
+                raise KeyError
         except KeyError:
             return Response(status=404)
 
