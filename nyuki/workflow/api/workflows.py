@@ -401,12 +401,12 @@ class ApiTaskReporting:
         Return all the current reporting data for this task.
         """
         try:
-            workflow = self.nyuki.running_workflows[iid].instance.report()
-            for task in workflow['tasks']:
-                if task['exec'] and task['exec']['id'] == tid:
-                    return Response(task['exec'].get('reporting') or {})
+            workflow = self.nyuki.running_workflows[iid].instance
+            for task in workflow.tasks:
+                if task.uid == tid:
+                    return Response(task.holder.report() or {})
             else:
-                raise KeyError
+                return Response(status=404)
         except KeyError:
             return Response(status=404)
 
