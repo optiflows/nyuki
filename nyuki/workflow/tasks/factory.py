@@ -128,9 +128,6 @@ class FactoryTask(TaskHolder):
             runtime.config['api']['port']
         )
 
-    def comments(self):
-        return {'errors': self._diff.get('errors', False)}
-
     def report(self):
         return self._diff
 
@@ -193,4 +190,5 @@ class FactoryTask(TaskHolder):
         task = asyncio.Task.current_task()
         task.dispatch_progress(self._diff)
         log.debug('Conversion diff: %s', self._diff)
+        data['errors'] = self._diff.get('errors', False)
         return data

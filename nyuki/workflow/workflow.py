@@ -22,6 +22,7 @@ from .api.templates import (
     ApiTasks, ApiTemplates, ApiTemplate, ApiTemplateVersion, ApiTemplateDraft
 )
 from .api.workflows import (
+    WS_FILTERS,
     ApiWorkflow, ApiWorkflows, ApiWorkflowsHistory, ApiWorkflowHistory,
     ApiWorkflowTriggers, ApiWorkflowTrigger, ApiWorkflowHistoryTask,
     ApiWorkflowHistoryTaskData, ApiTaskReporting,
@@ -125,8 +126,8 @@ class WorkflowInstance:
                 del task['exec']['outputs']
             # Stored template contains more info than tukio's (title...),
             # so we add it to the report.
-            tasks[task['id']] = {**tasks[task['id']], **task}
-        result['tasks'] = [task for task in tasks.values()]
+            tasks[task['id']].update(**task)
+        result['tasks'] = list(tasks.values())
         return result
 
 
@@ -264,7 +265,7 @@ class WorkflowNyuki(Nyuki):
         # The requester is required for the frontend
         requester = wflow.exec.get('requester')
         if requester:
-            payload['workflow']['workflow_exec_requester'] = requester
+            payload['workflow']['requester'] = requester
 
         # A task information requires the corresponding template_id
         # and a more precise topic.
@@ -282,9 +283,17 @@ class WorkflowNyuki(Nyuki):
                 payload['data'] = event.data.get('content') or {}
                 topic = '{}/reporting'.format(topic)
 
-            elif event.data['type'] == TaskExecState.end.value:
-                # Add the task's comments, if any (quorom, status...)
-                payload['data'] = event.data['content'].get('__comments__') or {}
+            elif event.data['type'] in (
+                TaskExecState.end.value,
+                TaskExecState.error.value,
+            ):
+                if isinstance(event.data['content'], dict):
+                    # Only send the task's important fields, if any
+                    payload['data'] = {
+                        key: event.data['content'][key]
+                        for key in WS_FILTERS
+                        if key in event.data['content']
+                    }
 
             # Update topic for this event
             payload['topic'] = topic
