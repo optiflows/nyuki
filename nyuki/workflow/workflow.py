@@ -25,7 +25,7 @@ from .api.workflows import (
     WS_FILTERS,
     ApiWorkflow, ApiWorkflows, ApiWorkflowsHistory, ApiWorkflowHistory,
     ApiWorkflowTriggers, ApiWorkflowTrigger, ApiWorkflowHistoryTask,
-    ApiWorkflowHistoryTaskData, ApiTaskReporting,
+    ApiWorkflowHistoryTaskData, ApiTaskReporting, ApiTaskReportingContact,
 )
 from .api.vars import (
     ApiVars, ApiVarsVersion, ApiVarsDraft
@@ -33,7 +33,7 @@ from .api.vars import (
 
 from .storage import MongoStorage
 from .tasks import *
-from .tasks.utils import runtime
+from .tasks.utils import runtime, CONTACT_KEY, CONTACT_PROGRESS
 
 
 log = logging.getLogger(__name__)
@@ -166,6 +166,7 @@ class WorkflowNyuki(Nyuki):
         ApiWorkflows,  # /v1/workflow/instances
         ApiWorkflow,  # /v1/workflow/instances/{uid}
         ApiTaskReporting,  # /v1/workflow/instances/{uid}/tasks/{task_id}/reporting
+        ApiTaskReportingContact,  # /v1/workflow/instances/{uid}/tasks/{task_id}/reporting/{contact_id}
         ApiWorkflowsHistory,  # /v1/workflows/history
         ApiWorkflowHistory,  # /v1/workflows/history/{uid}
         ApiWorkflowHistoryTask,  # /v1/workflows/history/{uid}/tasks/{task_id}
@@ -278,10 +279,18 @@ class WorkflowNyuki(Nyuki):
                 'template_id': source['task_template_id'],
             }
 
+            # Append full data if this is a 'task-progress'
             if event.data['type'] == TaskExecState.progress.value:
-                # Only append full data if this is a 'task-progress'
                 payload['data'] = event.data.get('content') or {}
                 topic = '{}/reporting'.format(topic)
+
+            # Custom event type for single contact updates
+            elif event.data['type'] == CONTACT_PROGRESS:
+                payload['data'] = event.data.get('content') or {}
+                contact = payload['data'][CONTACT_KEY]
+                topic = '{}/reporting/{}'.format(topic, contact)
+                payload['workflow']['task']['contact'] = contact
+                del payload['data'][CONTACT_KEY]
 
             elif event.data['type'] in (
                 TaskExecState.end.value,
