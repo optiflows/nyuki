@@ -26,6 +26,7 @@ from .api.workflows import (
     ApiWorkflow, ApiWorkflows, ApiWorkflowsHistory, ApiWorkflowHistory,
     ApiWorkflowTriggers, ApiWorkflowTrigger, ApiWorkflowHistoryTask,
     ApiWorkflowHistoryTaskData, ApiTaskReporting, ApiTaskReportingContact,
+    ApiTaskReportingContacts,
 )
 from .api.vars import (
     ApiVars, ApiVarsVersion, ApiVarsDraft
@@ -33,7 +34,7 @@ from .api.vars import (
 
 from .storage import MongoStorage
 from .tasks import *
-from .tasks.utils import runtime, CONTACT_KEY, CONTACT_PROGRESS
+from .tasks.utils import runtime, CONTACT_PROGRESS
 
 
 log = logging.getLogger(__name__)
@@ -166,7 +167,8 @@ class WorkflowNyuki(Nyuki):
         ApiWorkflows,  # /v1/workflow/instances
         ApiWorkflow,  # /v1/workflow/instances/{uid}
         ApiTaskReporting,  # /v1/workflow/instances/{uid}/tasks/{task_id}/reporting
-        ApiTaskReportingContact,  # /v1/workflow/instances/{uid}/tasks/{task_id}/reporting/{contact_id}
+        ApiTaskReportingContacts,  # /v1/workflow/instances/{uid}/tasks/{task_id}/reporting/contacts
+        ApiTaskReportingContact,  # /v1/workflow/instances/{uid}/tasks/{task_id}/reporting/contacts/{contact_id}
         ApiWorkflowsHistory,  # /v1/workflows/history
         ApiWorkflowHistory,  # /v1/workflows/history/{uid}
         ApiWorkflowHistoryTask,  # /v1/workflows/history/{uid}/tasks/{task_id}
@@ -287,10 +289,9 @@ class WorkflowNyuki(Nyuki):
             # Custom event type for single contact updates
             elif event.data['type'] == CONTACT_PROGRESS:
                 payload['data'] = event.data.get('content') or {}
-                contact = payload['data'][CONTACT_KEY]
-                topic = '{}/reporting/{}'.format(topic, contact)
-                payload['workflow']['task']['contact'] = contact
-                del payload['data'][CONTACT_KEY]
+                topic = '{}/reporting/contacts/{}'.format(
+                    topic, payload['data']['contact'],
+                )
 
             elif event.data['type'] in (
                 TaskExecState.end.value,

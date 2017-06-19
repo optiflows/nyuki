@@ -274,8 +274,7 @@ class MqttBus(Service):
         """
         uid = previous_uid or str(uuid4())
         topic = topic or self.name
-        log.debug('Publishing an event to %s', topic)
-        log.debug('data dump: %s', data)
+        log.debug("Publishing event to '%s': %s", topic, data)
         data = json.dumps(data, default=serialize_object)
 
         if self.client._connected_state.is_set():

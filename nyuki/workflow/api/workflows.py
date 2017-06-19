@@ -412,12 +412,31 @@ class ApiTaskReporting:
             return Response(status=404)
 
 
-@resource('/workflow/instances/{iid}/tasks/{tid}/reporting/{cuid}', versions=['v1'])
+@resource('/workflow/instances/{iid}/tasks/{tid}/reporting/contacts', versions=['v1'])
+class ApiTaskReportingContacts:
+
+    async def get(self, request, iid, tid):
+        """
+        Return all contacts' informations from the reporting data of this task.
+        """
+        try:
+            workflow = self.nyuki.running_workflows[iid].instance
+            for task in workflow.tasks:
+                if task.uid == tid:
+                    report = task.holder.report() or {}
+                    return Response(report['contacts'])
+            else:
+                return Response(status=404)
+        except KeyError:
+            return Response(status=404)
+
+
+@resource('/workflow/instances/{iid}/tasks/{tid}/reporting/contacts/{cuid}', versions=['v1'])
 class ApiTaskReportingContact:
 
     async def get(self, request, iid, tid, cuid):
         """
-        Return all the current reporting data for this task.
+        Return one contact's informations from the reporting data of this task.
         """
         try:
             workflow = self.nyuki.running_workflows[iid].instance
