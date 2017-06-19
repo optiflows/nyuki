@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from bson.codec_options import CodecOptions
 
 from nyuki.utils import from_isoformat
-from nyuki.api import Response, resource, content_type
+from nyuki.api import Response, resource, content_type, HTTPBreak
 from nyuki.workflow.tasks.utils.uri import URI, InvalidWorkflowUri
 
 
@@ -423,12 +423,13 @@ class ApiTaskReportingContacts:
             workflow = self.nyuki.running_workflows[iid].instance
             for task in workflow.tasks:
                 if task.uid == tid:
-                    report = task.holder.report() or {}
-                    return Response(report['contacts'])
+                    if not hasattr(task.holder, 'report_contacts'):
+                        raise HTTPBreak(404)
+                    return Response(task.holder.report_contacts())
             else:
-                return Response(status=404)
+                raise HTTPBreak(404)
         except KeyError:
-            return Response(status=404)
+            raise HTTPBreak(404)
 
 
 @resource('/workflow/instances/{iid}/tasks/{tid}/reporting/contacts/{cuid}', versions=['v1'])
@@ -442,12 +443,14 @@ class ApiTaskReportingContact:
             workflow = self.nyuki.running_workflows[iid].instance
             for task in workflow.tasks:
                 if task.uid == tid:
-                    report = task.holder.report() or {}
-                    return Response(report['contacts'][cuid])
+                    if not hasattr(task.holder, 'report_contacts'):
+                        raise HTTPBreak(404)
+                    contacts = task.holder.report_contacts()
+                    return Response(contacts[cuid])
             else:
-                return Response(status=404)
+                raise HTTPBreak(404)
         except KeyError:
-            return Response(status=404)
+            raise HTTPBreak(404)
 
 
 @resource('/workflow/history', versions=['v1'])
