@@ -124,7 +124,13 @@ class WorkflowInstance:
             if task.get('exec') and data is False:
                 del task['exec']['reporting']
                 del task['exec']['inputs']
-                del task['exec']['outputs']
+                # Leave the necessary task-end informations available
+                if task['exec']['outputs']:
+                    task['exec']['outputs'] = {
+                        key: task['exec']['outputs'][key]
+                        for key in WS_FILTERS
+                        if key in task['exec']['outputs']
+                    }
             # Stored template contains more info than tukio's (title...),
             # so we add it to the report.
             tasks[task['id']].update(**task)
