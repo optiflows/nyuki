@@ -236,17 +236,25 @@ class ApiWorkflows(_WorkflowResource):
         """
         Return workflow instances
         """
-        return Response([
-            workflow.report(tasks=request.GET.get('tasks', '0') == '1')
-            for workflow in self.nyuki.running_workflows.values()
-        ])
+        workflows = []
+        children = request.GET.get('children', '0') == '1'
+        tasks = request.GET.get('tasks', '0') == '1'
+
+        for wflow in self.nyuki.running_workflows.values():
+            if children is False:
+                requester = wflow.exec.get('requester')
+                if requester and requester.startswith('nyuki://'):
+                    continue
+            workflows.append(wflow.report(tasks=tasks))
+
+        return Response(workflows)
 
     async def put(self, request):
         """
         Start a workflow from payload:
         {
             "id": "template_id",
-            "draft": true/false
+            "draft": true/false,
             "exec": {}
         }
         """

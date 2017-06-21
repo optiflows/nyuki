@@ -193,9 +193,8 @@ class MqttBus(Service):
         if not asyncio.iscoroutinefunction(callback):
             raise ValueError('event callback must be a coroutine')
 
+        sub = False
         log.debug('MQTT subscription to %s -> %s', topic, callback.__name__)
-        await self.client.subscribe([(topic, QOS_1)])
-
         # Regexes are about topics like 'word/+/word' or 'word/#'
         is_regex = '+' in topic or topic.endswith('#')
         if is_regex is True:
@@ -206,14 +205,19 @@ class MqttBus(Service):
                     regex=self._regex_topic(topic),
                     callbacks={callback},
                 )
+                sub = True
         # Standard topics are a simple dict/set pair.
         else:
             try:
                 self._subscriptions[topic].add(callback)
             except KeyError:
                 self._subscriptions[topic] = {callback}
+                sub = True
 
-        log.info('Subscribed to %s', topic)
+        # Send the subscription packet only if we were not subscribed yet
+        if sub is True:
+            await self.client.subscribe([(topic, QOS_1)])
+            log.info('Subscribed to %s', topic)
 
     async def _unsub_regex(self, topic, callback):
         """
@@ -355,11 +359,11 @@ class MqttBus(Service):
                 if mqttregex.regex.match(topic):
                     log.debug("Event from topic '%s': %s", topic, data)
                     for callback in mqttregex.callbacks:
-                        asyncio.ensure_future(callback(topic, copy(data)))
+                        asyncio.ensure_future(callback(topic, data.copy()))
 
             try:
                 # Iterate and call all single topic callbacks
                 for callback in self._subscriptions[topic]:
-                    asyncio.ensure_future(callback(topic, copy(data)))
+                    asyncio.ensure_future(callback(topic, data.copy()))
             except KeyError:
                 pass
