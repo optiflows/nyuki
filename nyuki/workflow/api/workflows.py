@@ -433,7 +433,7 @@ class ApiTaskReportingContacts:
                 if task.uid == tid:
                     if not hasattr(task.holder, 'report_contacts'):
                         raise HTTPBreak(404)
-                    return Response(task.holder.report_contacts())
+                    return Response(list(task.holder.report_contacts().values()))
             else:
                 raise HTTPBreak(404)
         except KeyError:
