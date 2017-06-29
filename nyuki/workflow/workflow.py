@@ -257,7 +257,11 @@ class WorkflowNyuki(Nyuki):
         """
         source = event.source.as_dict()
         exec_id = source['workflow_exec_id']
-        wflow = self.running_workflows[exec_id]
+        try:
+            wflow = self.running_workflows[exec_id]
+        except KeyError:
+            log.debug('Outdated event to report: %s', event)
+            return
         topic = 'workflow/exec/{}'.format(exec_id)
 
         payload = {
