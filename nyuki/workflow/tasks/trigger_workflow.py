@@ -1,10 +1,10 @@
-from aiohttp import ClientSession
-import asyncio
 import json
+import asyncio
 import logging
+import async_timeout
 from uuid import uuid4
 from enum import Enum
-
+from aiohttp import ClientSession
 from tukio.task import register
 from tukio.task.holder import TaskHolder
 from tukio.workflow import WorkflowExecState, Workflow
@@ -16,79 +16,68 @@ from .utils.uri import URI
 log = logging.getLogger(__name__)
 
 
-class Status(Enum):
+class WorkflowStatus(Enum):
+
+    PENDING = 'pending'
     RUNNING = 'running'
-    DONE = 'done'
     TIMEOUT = 'timeout'
+    DONE = 'done'
 
 
 @register('trigger_workflow', 'execute')
 class TriggerWorkflowTask(TaskHolder):
 
-    WORKFLOW_URL = 'http://{host}{nyuki_api}/v1/workflow/instances'
+    __slots__ = (
+        'template', 'blocking', 'task', '_engine',
+        'status', 'triggered_id', 'async_future',
+    )
+
     SCHEMA = {
         'type': 'object',
-        'required': ['nyuki_api', 'template'],
+        'required': ['template'],
+        'additionalProperties': False,
         'properties': {
-            'nyuki_api': {'type': 'string', 'description': 'nyuki_api'},
-            'template': {'type': 'string', 'description': 'template_id'},
-            'draft': {'type': 'boolean'},
-            'await_completion': {'type': 'boolean', 'default': True},
-            'timeout': {'type': 'integer', 'minimum': 1, 'default': 60}
+            'template': {
+                'type': 'object',
+                'required': ['service', 'id'],
+                'additionalProperties': False,
+                'properties': {
+                    'service': {'type': 'string', 'minLength': 1},
+                    'id': {'type': 'string', 'minLength': 1},
+                    'draft': {'type': 'boolean', 'default': False},
+                },
+            },
+            'blocking': {
+                'type': 'object',
+                'required': ['timeout'],
+                'additionalProperties': False,
+                'properties': {
+                    'timeout': {'type': 'integer', 'minimum': 1}
+                },
+            },
         },
-        'dependencies': {
-            'await_completion': ['timeout']
-        },
-        'additionalProperties': False
     }
 
     def __init__(self, config):
         super().__init__(config)
         self.template = self.config['template']
-        self.draft = self.config.get('draft', False)
-        self.blocking = self.config.get('await_completion', True)
-        self.timeout = self.config.get('timeout', 60)
-        # Workflow URL
-        self.nyuki_api = self.config.get('nyuki_api') or ''
-        if self.nyuki_api and not self.nyuki_api.startswith('/'):
-            self.nyuki_api = '/' + self.nyuki_api
-        self.url = self.WORKFLOW_URL.format(
-            host=runtime.config.get('http_host', 'localhost'),
-            nyuki_api=self.nyuki_api
+        self.blocking = self.config.get('blocking', {})
+        self.task = None
+        self._engine = 'http://{}/{}/api/v1/workflow'.format(
+            runtime.config.get('http_host', 'localhost'),
+            self.template['service'],
         )
 
-        self._task = None
-        self._triggered = {
-            'workflow_holder': self.nyuki_api.split('/')[1],
-            'workflow_template_id': self.template,
-            'workflow_exec_id': None,
-            'workflow_draft': self.draft,
-            'status': None
-        }
+        # Reporting
+        self.status = WorkflowStatus.PENDING.value
+        self.triggered_id = None
+        self.async_future = None
 
     def report(self):
-        return self._triggered
-
-    async def teardown(self):
-        exec_id = self._triggered['workflow_exec_id']
-        holder = self._triggered['workflow_holder']
-        wf_id = '{}@{}'.format(exec_id, holder)
-        if not exec_id:
-            log.debug('No triggered workflow to cancel')
-            return
-
-        async with ClientSession() as session:
-            params = {
-                'url': '{}/{}'.format(self.url, exec_id),
-                'headers': {'Content-Type': 'application/json'}
-            }
-            async with session.delete(**params) as response:
-                response = response.status
-
-        if response != 200:
-            log.debug('Failed to cancel triggered workflow {}'.format(wf_id))
-        else:
-            log.debug('Triggered workflow {} has been cancelled'.format(wf_id))
+        return {
+            'exec_id': self.triggered_id,
+            'status': self.status,
+        }
 
     async def async_exec(self, topic, data):
         log.debug(
@@ -104,26 +93,27 @@ class TriggerWorkflowTask(TaskHolder):
         Entrypoint execution method.
         """
         data = event.data
-        self._task = asyncio.Task.current_task()
+        self.task = asyncio.Task.current_task()
+        data['timeout'] = False
+        is_draft = self.template.get('draft', False)
 
         # Send the HTTP request
-        log.info('Request %s to process template %s', self.nyuki_api, self.template)
-        log.debug(
-            'Request details: url=%s, draft=%s, data=%s',
-            self.url, self.draft, data
-        )
+        log.info('Triggering template {}{} on service {}'.format(
+            self.template['id'],
+            ' (draft)' if is_draft else '',
+            self.template['service'],
+        ))
 
         # Setup headers (set requester and exec-track to avoid workflow loops)
-        workflow = Workflow.current_workflow()
-        wf_instance = runtime.workflows[workflow.uid]
-        parent = wf_instance.exec.get('requester')
-        track = list(wf_instance.exec.get('track', []))
+        workflow = runtime.workflows[Workflow.current_workflow().uid]
+        parent = workflow.exec.get('requester')
+        track = list(workflow.exec.get('track', []))
         if parent:
             track.append(parent)
 
         headers = {
             'Content-Type': 'application/json',
-            'Referer': URI.instance(workflow),
+            'Referer': URI.instance(workflow.instance),
             'X-Surycat-Exec-Track': ','.join(track)
         }
 
@@ -140,20 +130,31 @@ class TriggerWorkflowTask(TaskHolder):
 
             def _unsub(f):
                 asyncio.ensure_future(runtime.bus.unsubscribe(topic))
-            self._task.add_done_callback(_unsub)
+            self.task.add_done_callback(_unsub)
 
         async with ClientSession() as session:
+            # Compute data to send to sub-workflows
+            url = '{}/vars/{}{}'.format(
+                self._engine,
+                self.template['id'],
+                '/draft' if is_draft else '',
+            )
+            async with session.get(url) as response:
+                if response.status != 200:
+                    raise RuntimeError("Can't load template info")
+                wf_vars = await response.json()
+            lightened_data = {key: data[key] for key in wf_vars if key in data}
+
             params = {
-                'url': self.url,
+                'url': f"{self._engine}/instances",
                 'headers': headers,
                 'data': json.dumps({
-                    'id': self.template,
-                    'draft': self.draft,
-                    'inputs': data
+                    'id': self.template['id'],
+                    'draft': is_draft,
+                    'inputs': lightened_data,
                 })
             }
             async with session.put(**params) as response:
-                # Response validity
                 if response.status != 200:
                     msg = "Can't process workflow template {} on {}".format(
                         self.template, self.nyuki_api
@@ -163,27 +164,48 @@ class TriggerWorkflowTask(TaskHolder):
                         msg = "{}, reason: {}".format(msg, reason['error'])
                     raise RuntimeError(msg)
                 resp_body = await response.json()
+                self.triggered_id = resp_body['exec']['id']
 
-        instance = resp_body['exec']['id']
-        self._triggered['workflow_exec_id'] = instance
-        log.debug('Request sent successfully to {}', self.nyuki_api)
-
-        if not self.blocking:
-            self._triggered['status'] = Status.DONE.value
-            self._task.dispatch_progress(self.report())
+        wf_id = f"{self.triggered_id[:8]}@{self.template['service']}"
+        self.status = WorkflowStatus.RUNNING.value
+        log.info('Successfully started %s', wf_id)
+        self.task.dispatch_progress(self.report())
 
         # Block until task completed
         if self.blocking:
-            self._triggered['status'] = Status.RUNNING.value
-            self._task.dispatch_progress(self.report())
-            log.info('Waiting for %s@%s to complete', instance, self.nyuki_api)
+            timeout = self.blocking['timeout']
+            log.info(
+                'Waiting %s seconds for workflow %s to complete',
+                timeout, wf_id,
+            )
             try:
-                await asyncio.wait_for(self.async_future, self.timeout)
-                self._triggered['status'] = Status.DONE.value
-                log.info('Instance %s@%s is done', instance, self.nyuki_api)
+                with async_timeout.timeout(timeout):
+                    await self.async_future
             except asyncio.TimeoutError:
-                self._triggered['status'] = Status.TIMEOUT.value
-                log.info('Instance %s@%s has timeouted', instance, self.nyuki_api)
-            self._task.dispatch_progress({'status': self._triggered['status']})
+                data['timeout'] = True
+                self.status = WorkflowStatus.TIMEOUT.value
+                log.info('Workflow %s has timed out', wf_id)
+            else:
+                self.status = WorkflowStatus.DONE.value
+                log.info('Workflow %s is done', wf_id)
+
+            self.task.dispatch_progress({'status': self.status})
 
         return data
+
+    async def teardown(self):
+        """
+        Called when this task is cancelled.
+        """
+        if not self.triggered_id:
+            log.debug('No workflow to cancel')
+            return
+
+        wf_id = f"{self.triggered_id[:8]}@{self.template['service']}"
+        async with ClientSession() as session:
+            url = f'{self._engine}/instances/{self.triggered_id}'
+            async with session.delete(url) as response:
+                if response.status != 200:
+                    log.warning('Failed to cancel workflow %s', wf_id)
+                else:
+                    log.info('Workflow %s has been cancelled', wf_id)
