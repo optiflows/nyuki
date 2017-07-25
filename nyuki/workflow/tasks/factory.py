@@ -51,8 +51,8 @@ FACTORY_SCHEMAS = {
         'properties': {
             'type': {'type': 'string', 'enum': ['copy']},
             'fieldname': {'type': 'string', 'minLength': 1},
-            'copy': {'type': 'string', 'minLength': 1,
-                     'description': 'the copy filed name'}
+            # Name of the new field
+            'copy': {'type': 'string', 'minLength': 1},
         }
     },
     'sub': {
@@ -119,17 +119,15 @@ FACTORY_SCHEMAS = {
 @register('factory', 'execute')
 class FactoryTask(TaskHolder):
 
+    __slots__ = ('api_url')
+
     SCHEMA = generate_factory_schema(**FACTORY_SCHEMAS)
 
     def __init__(self, config):
         super().__init__(config)
-        self._diff = None
         self.api_url = 'http://localhost:{}/v1/workflow'.format(
             runtime.config['api']['port']
         )
-
-    def report(self):
-        return self._diff
 
     async def get_regex(self, session, rule):
         """
@@ -182,13 +180,9 @@ class FactoryTask(TaskHolder):
         data = event.data
         runtime_config = deepcopy(self.config)
         await self.get_factory_rules(runtime_config)
-
         log.debug('Full factory config: %s', runtime_config)
-        converter = Converter.from_dict(runtime_config)
-        self._diff = converter.apply(data)
 
-        task = asyncio.Task.current_task()
-        task.dispatch_progress(self._diff)
-        log.debug('Conversion diff: %s', self._diff)
-        data['errors'] = self._diff.get('errors', False)
+        converter = Converter.from_dict(runtime_config)
+        data['diff'] = converter.apply(data)
+        log.debug('Conversion diff: %s', data['diff'])
         return data

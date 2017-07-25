@@ -262,34 +262,21 @@ class WorkflowNyuki(Nyuki):
         except KeyError:
             log.debug('Outdated event to report: %s', event)
             return
-        topic = 'workflow/exec/{}'.format(exec_id)
 
+        topic = 'workflow/exec/{}'.format(exec_id)
         payload = {
             'type': event.data['type'],
             'ts': utcnow(),
             'topic': topic,
             'service': self.bus.name,
-            'workflow': {
-                'exec_id': exec_id,
-                'template_id': source['workflow_template_id'],
-            }
         }
 
-        # The requester is required for the frontend
-        requester = wflow.exec.get('requester')
-        if requester:
-            payload['workflow']['requester'] = requester
-
-        # A task information requires the corresponding template_id
+        # A task information requires the corresponding template id
         # and a more precise topic.
         task_exec_id = source.get('task_exec_id')
         if task_exec_id:
             topic = '{}/tasks/{}'.format(topic, task_exec_id)
-            # Add task source ids
-            payload['workflow']['task'] = {
-                'exec_id': source['task_exec_id'],
-                'template_id': source['task_template_id'],
-            }
+            payload['template'] = {'id': source['task_template_id']}
 
             # Append full data if this is a 'task-progress'
             if event.data['type'] == TaskExecState.progress.value:

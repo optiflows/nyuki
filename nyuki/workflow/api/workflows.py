@@ -20,7 +20,7 @@ from nyuki.workflow.tasks.utils.uri import URI, InvalidWorkflowUri
 
 
 log = logging.getLogger(__name__)
-WS_FILTERS = ('quorum', 'status', 'errors', 'twilio_error', 'timeout')
+WS_FILTERS = ('quorum', 'status', 'twilio_error', 'timeout', 'diff')
 
 
 class Ordering(Enum):
