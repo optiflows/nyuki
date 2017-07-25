@@ -287,7 +287,7 @@ class WorkflowNyuki(Nyuki):
             elif event.data['type'] == CONTACT_PROGRESS:
                 payload['data'] = event.data.get('content') or {}
                 topic = '{}/reporting/contacts/{}'.format(
-                    topic, payload['data']['contact'],
+                    topic, payload['data']['uid'],
                 )
 
             elif event.data['type'] in (
