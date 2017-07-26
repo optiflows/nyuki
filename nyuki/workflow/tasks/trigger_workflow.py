@@ -98,11 +98,8 @@ class TriggerWorkflowTask(TaskHolder):
         is_draft = self.template.get('draft', False)
 
         # Send the HTTP request
-        log.info('Triggering template {}{} on service {}'.format(
-            self.template['id'],
-            ' (draft)' if is_draft else '',
-            self.template['service'],
-        ))
+        log.info('Triggering template %s%s on service %s', self.template['id'],
+                 ' (draft)' if is_draft else '', self.template['service'])
 
         # Setup headers (set requester and exec-track to avoid workflow loops)
         workflow = runtime.workflows[Workflow.current_workflow().uid]
