@@ -295,6 +295,8 @@ class WorkflowNyuki(Nyuki):
                 topic = '{}/reporting/contacts/{}'.format(
                     topic, payload['data']['uid'],
                 )
+                # Remove contact uid (available in topic)
+                del payload['data']['uid']
 
             elif event.data['type'] in (
                 TaskExecState.end.value,
