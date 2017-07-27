@@ -271,6 +271,12 @@ class WorkflowNyuki(Nyuki):
             'service': self.bus.name,
         }
 
+        # If is a workflow update, send the 'child' value
+        if event.data['type'] in WorkflowExecState.values():
+            requester = wflow.exec.get('requester')
+            if requester:
+                payload['requester'] = requester
+
         # A task information requires the corresponding template id
         # and a more precise topic.
         task_exec_id = source.get('task_exec_id')
