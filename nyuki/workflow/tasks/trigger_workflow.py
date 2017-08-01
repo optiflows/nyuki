@@ -182,6 +182,7 @@ class TriggerWorkflowTask(TaskHolder):
                 data['timeout'] = True
                 self.status = WorkflowStatus.TIMEOUT.value
                 log.info('Workflow %s has timed out', wf_id)
+                asyncio.ensure_future(self.teardown())
             else:
                 self.status = WorkflowStatus.DONE.value
                 log.info('Workflow %s is done', wf_id)
