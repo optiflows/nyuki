@@ -59,7 +59,6 @@ class TriggerWorkflowTask(TaskHolder):
             runtime.config.get('http_host', 'localhost'),
             self.template['service'],
         )
-        self._engine = 'http://localhost:5558/v1/workflow'
 
         # Reporting
         self.status = WorkflowStatus.PENDING.value
@@ -140,7 +139,7 @@ class TriggerWorkflowTask(TaskHolder):
             }
 
             params = {
-                'url': f"{self._engine}/instances",
+                'url': '{}/instances'.format(self._engine),
                 'headers': headers,
                 'data': json.dumps({
                     'id': self.template['id'],
@@ -161,7 +160,7 @@ class TriggerWorkflowTask(TaskHolder):
                 resp_body = await response.json()
                 self.triggered_id = resp_body['exec']['id']
 
-        wf_id = f"{self.triggered_id[:8]}@{self.template['service']}"
+        wf_id = '@'.join([self.triggered_id[:8], self.template['service']])
         self.status = WorkflowStatus.RUNNING.value
         log.info('Successfully started %s', wf_id)
         self.task.dispatch_progress(self.report())
@@ -190,9 +189,9 @@ class TriggerWorkflowTask(TaskHolder):
             log.debug('No workflow to cancel')
             return
 
-        wf_id = f"{self.triggered_id[:8]}@{self.template['service']}"
+        wf_id = '@'.join([self.triggered_id[:8], self.template['service']])
         async with ClientSession() as session:
-            url = f'{self._engine}/instances/{self.triggered_id}'
+            url = '{}/instances/{}'.format(self._engine, self.triggered_id)
             async with session.delete(url) as response:
                 if response.status != 200:
                     log.warning('Failed to cancel workflow %s', wf_id)
