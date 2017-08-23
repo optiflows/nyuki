@@ -1,7 +1,6 @@
 import json
 import asyncio
 import logging
-import async_timeout
 from uuid import uuid4
 from enum import Enum
 from aiohttp import ClientSession
@@ -28,7 +27,7 @@ class WorkflowStatus(Enum):
 class TriggerWorkflowTask(TaskHolder):
 
     __slots__ = (
-        'template', 'blocking', 'task', '_engine',
+        'template', 'blocking', 'task', '_engine', 'data',
         'status', 'triggered_id', 'async_future',
     )
 
@@ -47,29 +46,24 @@ class TriggerWorkflowTask(TaskHolder):
                     'draft': {'type': 'boolean', 'default': False},
                 },
             },
-            'blocking': {
-                'type': 'object',
-                'required': ['timeout'],
-                'additionalProperties': False,
-                'properties': {
-                    'timeout': {'type': 'integer', 'minimum': 1}
-                },
-            },
+            'blocking': {'type': 'boolean', 'default': True},
         },
     }
 
     def __init__(self, config):
         super().__init__(config)
         self.template = self.config['template']
-        self.blocking = self.config.get('blocking', {})
+        self.blocking = self.config.get('blocking', True)
         self.task = None
         self._engine = 'http://{}/{}/api/v1/workflow'.format(
             runtime.config.get('http_host', 'localhost'),
             self.template['service'],
         )
+        self._engine = 'http://localhost:5558/v1/workflow'
 
         # Reporting
         self.status = WorkflowStatus.PENDING.value
+        self.data = None
         self.triggered_id = None
         self.async_future = None
 
@@ -92,9 +86,8 @@ class TriggerWorkflowTask(TaskHolder):
         """
         Entrypoint execution method.
         """
-        data = event.data
+        self.data = event.data
         self.task = asyncio.Task.current_task()
-        data['timeout'] = False
         is_draft = self.template.get('draft', False)
 
         # Send the HTTP request
@@ -119,8 +112,8 @@ class TriggerWorkflowTask(TaskHolder):
             topic = '{}/async/{}'.format(runtime.bus.name, str(uuid4())[:8])
             headers['X-Surycat-Async-Topic'] = topic
             headers['X-Surycat-Async-Events'] = ','.join([
-                WorkflowExecState.end.value,
-                WorkflowExecState.error.value,
+                WorkflowExecState.END.value,
+                WorkflowExecState.ERROR.value,
             ])
             self.async_future = asyncio.Future()
             await runtime.bus.subscribe(topic, self.async_exec)
@@ -140,7 +133,11 @@ class TriggerWorkflowTask(TaskHolder):
                 if response.status != 200:
                     raise RuntimeError("Can't load template info")
                 wf_vars = await response.json()
-            lightened_data = {key: data[key] for key in wf_vars if key in data}
+            lightened_data = {
+                key: self.data[key]
+                for key in wf_vars
+                if key in self.data
+            }
 
             params = {
                 'url': f"{self._engine}/instances",
@@ -153,6 +150,7 @@ class TriggerWorkflowTask(TaskHolder):
             }
             async with session.put(**params) as response:
                 if response.status != 200:
+                    log.critical(await response.text())
                     msg = "Can't process workflow template {} on {}".format(
                         self.template, self.nyuki_api
                     )
@@ -170,31 +168,24 @@ class TriggerWorkflowTask(TaskHolder):
 
         # Block until task completed
         if self.blocking:
-            timeout = self.blocking['timeout']
-            log.info(
-                'Waiting %s seconds for workflow %s to complete',
-                timeout, wf_id,
-            )
-            try:
-                with async_timeout.timeout(timeout):
-                    await self.async_future
-            except asyncio.TimeoutError:
-                data['timeout'] = True
-                self.status = WorkflowStatus.TIMEOUT.value
-                log.info('Workflow %s has timed out', wf_id)
-                asyncio.ensure_future(self.teardown())
-            else:
-                self.status = WorkflowStatus.DONE.value
-                log.info('Workflow %s is done', wf_id)
-
+            log.info('Waiting for workflow %s to complete', wf_id)
+            await self.async_future
+            self.status = WorkflowStatus.DONE.value
+            log.info('Workflow %s is done', wf_id)
             self.task.dispatch_progress({'status': self.status})
 
-        return data
+        return self.data
 
     async def teardown(self):
         """
         Called when this task is cancelled.
         """
+        if self.task.timed_out is True:
+            self.status = WorkflowStatus.TIMEOUT.value
+        else:
+            self.status = WorkflowStatus.DONE.value
+
+        self.task.dispatch_progress({'status': self.status})
         if not self.triggered_id:
             log.debug('No workflow to cancel')
             return
@@ -207,3 +198,5 @@ class TriggerWorkflowTask(TaskHolder):
                     log.warning('Failed to cancel workflow %s', wf_id)
                 else:
                     log.info('Workflow %s has been cancelled', wf_id)
+
+        return self.data

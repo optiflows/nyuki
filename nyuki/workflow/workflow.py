@@ -287,7 +287,7 @@ class WorkflowNyuki(Nyuki):
             payload['template'] = {'id': source['task_template_id']}
 
             # Append full data if this is a 'task-progress'
-            if event.data['type'] == TaskExecState.progress.value:
+            if event.data['type'] == TaskExecState.PROGRESS.value:
                 payload['data'] = event.data.get('content') or {}
                 topic = '{}/reporting'.format(topic)
 
@@ -301,8 +301,8 @@ class WorkflowNyuki(Nyuki):
                 del payload['data']['uid']
 
             elif event.data['type'] in (
-                TaskExecState.end.value,
-                TaskExecState.error.value,
+                TaskExecState.END.value,
+                TaskExecState.ERROR.value,
             ):
                 if isinstance(event.data['content'], dict):
                     # Only send the task's important fields, if any
@@ -317,12 +317,12 @@ class WorkflowNyuki(Nyuki):
 
         memwrite = True
         # Workflow begins, also send the full template.
-        if event.data['type'] == WorkflowExecState.begin.value:
+        if event.data['type'] == WorkflowExecState.BEGIN.value:
             payload['template'] = dict(wflow.template)
         # Workflow ended, clear it from memory
         elif event.data['type'] in [
-            WorkflowExecState.end.value,
-            WorkflowExecState.error.value
+            WorkflowExecState.END.value,
+            WorkflowExecState.ERROR.value
         ]:
             # Sanitize objects to store the finished workflow instance
             asyncio.ensure_future(self.storage.workflow_instances.insert(

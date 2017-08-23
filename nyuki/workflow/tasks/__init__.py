@@ -34,6 +34,5 @@ JoinTask.SCHEMA = {
                 {'type': 'integer', 'minimum': 2}
             ]
         },
-        'timeout': {'type': 'integer', 'minimum': 1}
     }
 }

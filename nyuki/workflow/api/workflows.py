@@ -38,8 +38,8 @@ class _WorkflowResource:
                 await self.nyuki.bus.publish(event.data, async_topic)
             # If the workflow is in a final state, unregister
             if event.data['type'] in [
-                WorkflowExecState.end.value,
-                WorkflowExecState.error.value
+                WorkflowExecState.END.value,
+                WorkflowExecState.ERROR.value
             ]:
                 broker.unregister(exec_handler, topic=topic)
 
