@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from pymongo import DESCENDING
 from pymongo.errors import AutoReconnect, DuplicateKeyError
 from tukio.workflow import TemplateGraphError, WorkflowTemplate
 
@@ -17,186 +16,6 @@ class ConflictError(Exception):
 
 class DuplicateTemplateError(Exception):
     pass
-
-
-class TemplateCollection:
-
-    """
-    Holds all the templates created for tukio, with their versions.
-    These records will be used to ensure a persistence of created workflows
-    in case the nyuki get into trouble.
-    Templates are retrieved and loaded at startup.
-    """
-
-    def __init__(self, templates_collection, metadata_collection):
-        self._templates = templates_collection
-        self._metadata = metadata_collection
-        # Indexes (ASCENDING by default)
-        asyncio.ensure_future(self._metadata.create_index('id', unique=True))
-        asyncio.ensure_future(self._templates.create_index(
-            [('id', DESCENDING), ('version', DESCENDING)],
-            unique=True
-        ))
-        asyncio.ensure_future(self._templates.create_index(
-            [('id', DESCENDING), ('draft', DESCENDING)]
-        ))
-
-    async def get_metadata(self, tid=None):
-        """
-        Return metadata
-        """
-        query = {'id': tid} if tid else None
-        cursor = self._metadata.find(query, {'_id': 0})
-        return await cursor.to_list(None)
-
-    async def get_all(self, full=False, latest=False, draft=False, with_metadata=True):
-        """
-        Return all templates, used at nyuki's startup and GET /v1/templates
-        Fetch latest versions if latest=True
-        Fetch drafts if draft=True
-        Both drafts and latest version if both are True
-        """
-        filters = {'_id': 0}
-        # '/v1/workflow/templates' does not requires all the informations
-        if full is False:
-            filters.update({'id': 1, 'draft': 1, 'version': 1, 'topics': 1})
-
-        cursor = self._templates.find(None, filters)
-        cursor.sort('version', DESCENDING)
-        templates = await cursor.to_list(None)
-
-        # Collect metadata
-        if with_metadata and templates:
-            metadatas = await self.get_metadata()
-            metadatas = {meta['id']: meta for meta in metadatas}
-            for template in templates:
-                template.update(metadatas[template['id']])
-
-        if latest is False and draft is False:
-            return templates
-
-        # Retrieve the latest versions + drafts
-        lasts = {}
-        drafts = []
-
-        for template in templates:
-            if draft and template['draft']:
-                drafts.append(template)
-            elif latest and not template['draft'] and template['id'] not in lasts:
-                lasts[template['id']] = template
-
-        return drafts + list(lasts.values())
-
-    async def get(self, tid, version=None, draft=None, with_metadata=True):
-        """
-        Return a template's configuration and versions
-        """
-        query = {'id': tid}
-
-        if version:
-            query['version'] = int(version)
-        if draft is not None:
-            query['draft'] = draft
-
-        cursor = self._templates.find(query, {'_id': 0})
-        cursor.sort('version', DESCENDING)
-        templates = await cursor.to_list(None)
-
-        # Collect metadata
-        if with_metadata and templates:
-            metadatas = await self.get_metadata(tid)
-            if metadatas:
-                for template in templates:
-                    template.update(metadatas[0])
-
-        return templates
-
-    async def get_last_version(self, tid):
-        """
-        Return the highest version of a template
-        """
-        query = {'id': tid, 'draft': False}
-        cursor = self._templates.find(query)
-        cursor.sort('version', DESCENDING)
-        await cursor.fetch_next
-
-        template = cursor.next_object()
-        return template['version'] if template else 0
-
-    async def insert(self, template):
-        """
-        Insert a template dict, not updatable
-        """
-        query = {
-            'id': template['id'],
-            'version': template['version']
-        }
-
-        # Remove draft if any
-        await self.delete(template['id'], template['version'], True)
-
-        log.info('Insert template with query: %s', query)
-        try:
-            # Copy dict, mongo somehow alter the given dict
-            await self._templates.insert(template.copy())
-        except DuplicateKeyError as exc:
-            raise DuplicateTemplateError from exc
-
-    async def insert_draft(self, template):
-        """
-        Check and insert draft, updatable
-        """
-        query = {
-            'id': template['id'],
-            'draft': True
-        }
-
-        try:
-            log.info('Update draft for query: %s', query)
-            await self._templates.update(query, template, upsert=True)
-        except DuplicateKeyError as exc:
-            raise DuplicateTemplateError from exc
-
-    async def insert_metadata(self, metadata):
-        """
-        Check and insert metadata
-        """
-        query = {'id': metadata['id']}
-
-        metadata = {
-            'id': metadata['id'],
-            'title': metadata.get('title', ''),
-            'tags': metadata.get('tags', [])
-        }
-
-        log.info('Update metadata for query: %s', query)
-        await self._metadata.update(query, metadata, upsert=True)
-
-        return metadata
-
-    async def publish_draft(self, tid):
-        """
-        From draft to production
-        """
-        query = {'id': tid, 'draft': True}
-        await self._templates.update(query, {'$set': {'draft': False}})
-
-    async def delete(self, tid, version=None, draft=None):
-        """
-        Delete a template from its id with all its versions
-        """
-        query = {'id': tid}
-        if version:
-            query['version'] = version
-        if draft is not None:
-            query['draft'] = draft
-
-        log.info("Removing template(s) with query: %s", query)
-
-        await self._templates.remove(query)
-        left = await self._templates.find({'id': tid}).count()
-        if not left:
-            await self._metadata.remove({'id': tid})
 
 
 @resource('/workflow/tasks', versions=['v1'])
@@ -302,9 +121,10 @@ class ApiTemplates(_TemplateResource):
             })
 
         try:
-            metadata = await self.nyuki.storage.templates.get_metadata(template.uid)
+            metadata = await self.nyuki.storage.metadata.get_one(template.uid)
         except AutoReconnect:
             return Response(status=503)
+
         if not metadata:
             if 'title' not in request:
                 return Response(status=400, body={
@@ -317,9 +137,7 @@ class ApiTemplates(_TemplateResource):
                 'tags': request.get('tags', [])
             }
 
-            await self.nyuki.storage.templates.insert_metadata(metadata)
-        else:
-            metadata = metadata[0]
+            await self.nyuki.storage.metadata.insert(metadata)
 
         try:
             tmpl_dict = await self.update_draft(template, request)
@@ -385,8 +203,7 @@ class ApiTemplate(_TemplateResource):
                 'error': exc
             })
 
-        metadata = await self.nyuki.storage.templates.get_metadata(template.uid)
-        metadata = metadata[0]
+        metadata = await self.nyuki.storage.metadata.get_one(template.uid)
 
         return Response({
             **tmpl_dict,
@@ -408,9 +225,9 @@ class ApiTemplate(_TemplateResource):
         request = await request.json()
 
         # Add ID, request dict cleaned in storage
-        metadata = await self.nyuki.storage.templates.insert_metadata({
+        metadata = await self.nyuki.storage.metadata.insert({
             **request,
-            'id': tid
+            'id': tid,
         })
 
         return Response(metadata)
@@ -545,8 +362,7 @@ class ApiTemplateDraft(_TemplateResource):
                 'error': str(exc)
             })
 
-        metadata = await self.nyuki.storage.templates.get_metadata(template.uid)
-        metadata = metadata[0]
+        metadata = await self.nyuki.storage.metadata.get_one(template.uid)
 
         return Response({
             **tmpl_dict,

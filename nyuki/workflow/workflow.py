@@ -13,6 +13,8 @@ from nyuki import Nyuki
 from nyuki.bus import reporting
 from nyuki.memory import memsafe
 from nyuki.utils import serialize_object, utcnow
+from nyuki.workflow.db.storage import MongoStorage
+from nyuki.workflow.db.task_instances import WS_FILTERS
 
 from .api.factory import (
     ApiFactoryRegex, ApiFactoryRegexes, ApiFactoryLookup, ApiFactoryLookups,
@@ -22,7 +24,6 @@ from .api.templates import (
     ApiTasks, ApiTemplates, ApiTemplate, ApiTemplateVersion, ApiTemplateDraft
 )
 from .api.workflows import (
-    WS_FILTERS,
     ApiWorkflow, ApiWorkflows, ApiWorkflowsHistory, ApiWorkflowHistory,
     ApiWorkflowTriggers, ApiWorkflowTrigger, ApiWorkflowHistoryTask,
     ApiWorkflowHistoryTaskData, ApiTaskReporting, ApiTaskReportingContact,
@@ -32,7 +33,6 @@ from .api.vars import (
     ApiVars, ApiVarsVersion, ApiVarsDraft
 )
 
-from .storage import MongoStorage
 from .tasks import *
 from .tasks.utils import runtime, CONTACT_PROGRESS
 
@@ -198,7 +198,7 @@ class WorkflowNyuki(Nyuki):
         self.migrate_config()
         self.register_schema(self.CONF_SCHEMA)
         self.engine = None
-        self.storage = None
+        self.storage = MongoStorage()
 
         self.AVAILABLE_TASKS = {}
         for name, value in TaskRegistry.all().items():
@@ -323,7 +323,7 @@ class WorkflowNyuki(Nyuki):
             WorkflowExecState.error.value
         ]:
             # Sanitize objects to store the finished workflow instance
-            asyncio.ensure_future(self.storage.instances.insert(
+            asyncio.ensure_future(self.storage.workflow_instances.insert(
                 sanitize_workflow_exec(wflow.report())
             ))
             del self.running_workflows[exec_id]
@@ -364,7 +364,7 @@ class WorkflowNyuki(Nyuki):
         """
         Check mongo, retrieve and load all templates
         """
-        self.storage = MongoStorage(**self.mongo_config)
+        self.storage.configure(**self.mongo_config)
 
         templates = await self.storage.templates.get_all(
             full=True,
