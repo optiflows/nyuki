@@ -349,6 +349,8 @@ class WorkflowNyuki(Nyuki):
         """
         templates = {}
         # Retrieve full workflow templates
+        # TODO: Better way to fetch the full template details
+        # (this does may more requests than it should)
         wf_templates = await self.engine.selector.select(efrom)
         for wftmpl in wf_templates:
             template = await self.storage.workflow_templates.get_one(

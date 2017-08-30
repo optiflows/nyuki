@@ -241,11 +241,6 @@ class ApiTemplate(_TemplateResource):
         await self.nyuki.storage.workflow_templates.delete(tid)
         await self.nyuki.storage.triggers.delete(tid)
 
-        try:
-            await self.nyuki.engine.unload(tid)
-        except KeyError as exc:
-            log.debug(exc)
-
         return Response(tmpl)
 
 
@@ -277,7 +272,7 @@ class ApiTemplateVersion(_TemplateResource):
             return Response(status=404)
 
         await self.nyuki.storage.workflow_templates.delete(tid, version)
-        return Response(tmpl[0])
+        return Response(tmpl)
 
 
 @resource('/workflow/templates/{tid}/draft', versions=['v1'])
@@ -373,4 +368,4 @@ class ApiTemplateDraft(_TemplateResource):
             return Response(status=404)
 
         await self.nyuki.storage.workflow_templates.delete(tid, draft=True)
-        return Response(tmpl[0])
+        return Response(tmpl)

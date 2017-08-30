@@ -2,7 +2,6 @@ import asyncio
 import logging
 from copy import deepcopy
 from pymongo import DESCENDING
-from pymongo.errors import DuplicateKeyError
 
 
 log = logging.getLogger(__name__)
@@ -108,7 +107,6 @@ class WorkflowTemplateCollection:
         cursor = self._templates.find(query, {'_id': 0})
         templates = await cursor.to_list(None)
 
-        # TODO: Less mongo requests
         for template in templates:
             template['tasks'] = await self._storage.task_templates.get(
                 template['id'], template['version']
