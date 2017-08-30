@@ -99,7 +99,12 @@ class WorkflowTemplateCollection:
         Return the latest templates (non-draft) that wait
         for a certain topic.
         """
-        query = {'topics': topic, 'draft': False}
+        query = {
+            '$or': [
+                {'topics': topic, 'draft': False},
+                {'topics': None, 'draft': False},
+            ]
+        }
         cursor = self._templates.find(query, {'_id': 0})
         templates = await cursor.to_list(None)
 
