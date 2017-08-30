@@ -344,6 +344,7 @@ class WorkflowNyuki(Nyuki):
     async def workflow_event(self, efrom, data):
         """
         New bus event received, trigger workflows if needed.
+        TODO: Fetch topics from DB on-the-go
         """
         templates = {}
         # Retrieve full workflow templates
@@ -363,21 +364,22 @@ class WorkflowNyuki(Nyuki):
     async def reload_from_storage(self):
         """
         Check mongo, retrieve and load all templates
+        TODO: Fetch topics from DB on-the-go
         """
         self.storage.configure(**self.mongo_config)
 
-        templates = await self.storage.templates.get_all(
-            full=True,
-            latest=True,
-            with_metadata=False
-        )
+        # templates = await self.storage.templates.get_all(
+        #     full=True,
+        #     with_draft=False,
+        #     with_metadata=False,
+        # )
 
-        for template in templates:
-            try:
-                await self.engine.load(WorkflowTemplate.from_dict(template))
-            except Exception as exc:
-                # Means a bad workflow is in database, report it
-                reporting.exception(exc)
+        # for template in templates:
+        #     try:
+        #         await self.engine.load(WorkflowTemplate.from_dict(template))
+        #     except Exception as exc:
+        #         # Means a bad workflow is in database, report it
+        #         reporting.exception(exc)
 
     @memsafe
     async def failure_handler(self, instances):

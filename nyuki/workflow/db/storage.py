@@ -6,7 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from .triggers import TriggerCollection
 from .data_processing import DataProcessingCollection
 from .metadata import MetadataCollection
-from .workflow_templates import TemplateCollection
+from .workflow_templates import WorkflowTemplateCollection
 from .workflow_instances import WorkflowInstanceCollection
 from .task_instances import TaskInstanceCollection
 
@@ -39,7 +39,7 @@ class MongoStorage:
         log.info("Workflow database: '%s'", db_name)
 
         # Collections
-        self.templates = TemplateCollection(self)
+        self.templates = WorkflowTemplateCollection(self)
         self.regexes = DataProcessingCollection(self, 'regexes')
         self.lookups = DataProcessingCollection(self, 'lookups')
         self.triggers = TriggerCollection(self)

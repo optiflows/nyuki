@@ -100,7 +100,7 @@ class ApiWorkflows(_WorkflowResource):
         else:
             # Fetch the template from the storage
             try:
-                templates = await self.nyuki.storage.templates.get(
+                template = await self.nyuki.storage.templates.get_one(
                     request['id'],
                     draft=draft,
                     with_metadata=True
@@ -108,12 +108,12 @@ class ApiWorkflows(_WorkflowResource):
             except AutoReconnect:
                 return Response(status=503)
 
-        if not templates:
+        if not template:
             return Response(status=404, body={
                 'error': 'Could not find a suitable template to run'
             })
 
-        wf_tmpl = WorkflowTemplate.from_dict(templates[0])
+        wf_tmpl = WorkflowTemplate.from_dict(template)
         try:
             wf_tmpl.root()
         except WorkflowRootTaskError:
@@ -430,7 +430,7 @@ class ApiWorkflowTriggers:
 
         content = form.file.read().decode('utf-8')
         try:
-            tmpl = await self.nyuki.storage.templates.get(tid)
+            tmpl = await self.nyuki.storage.templates.get_one(tid)
             if not tmpl:
                 return Response(status=404)
             trigger = await self.nyuki.storage.triggers.insert(tid, content)

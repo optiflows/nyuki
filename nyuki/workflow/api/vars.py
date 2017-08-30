@@ -28,7 +28,7 @@ class DataInspector(object):
 
     async def required_keys(self, tid, version=None, draft=False):
         try:
-            template = await self.nyuki.storage.templates.get(
+            template = await self.nyuki.storage.templates.get_one(
                 tid=tid, version=version, draft=draft
             )
         except AutoReconnect:
@@ -36,9 +36,7 @@ class DataInspector(object):
         if not template:
             raise HTTPBreak(404, {'error': 'template not found'})
 
-        template = template[0]
         keys = set()
-
         for task in template.get('tasks', []):
             for key, data in task.get('config', {}).items():
                 # Get all evaluable inner-data

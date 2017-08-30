@@ -77,8 +77,6 @@ class ApiTemplates(_TemplateResource):
         try:
             templates = await self.nyuki.storage.templates.get_all(
                 full=(request.GET.get('full') == '1'),
-                latest=(request.GET.get('latest') == '1'),
-                draft=(request.GET.get('draft') == '1'),
             )
         except AutoReconnect:
             return Response(status=503)
@@ -92,7 +90,7 @@ class ApiTemplates(_TemplateResource):
 
         if 'id' in request:
             try:
-                draft = await self.nyuki.storage.templates.get(
+                draft = await self.nyuki.storage.templates.get_one(
                     request['id'], draft=True
                 )
             except AutoReconnect:
@@ -153,11 +151,15 @@ class ApiTemplate(_TemplateResource):
         Return the latest version of the template
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get(tid)
+            tmpl = await self.nyuki.storage.templates.get_one(tid)
         except AutoReconnect:
             return Response(status=503)
+
         if not tmpl:
-            return Response(status=404)
+            # Check if a draft is available
+            tmpl = await self.nyuki.storage.templates.get_one(tid, draft=True)
+            if not tmpl:
+                return Response(status=404)
 
         return Response(tmpl)
 
@@ -166,17 +168,17 @@ class ApiTemplate(_TemplateResource):
         Create a new draft for this template id
         """
         try:
-            versions = await self.nyuki.storage.templates.get(tid)
+            draft = await self.nyuki.storage.templates.get_one(tid, draft=True)
         except AutoReconnect:
             return Response(status=503)
-        if not versions:
-            return Response(status=404)
+        if draft:
+            return Response(status=409, body={
+                'error': 'This draft already exists'
+            })
 
-        for v in versions:
-            if v['draft'] is True:
-                return Response(status=409, body={
-                    'error': 'This draft already exists'
-                })
+        tmpl = await self.nyuki.storage.templates.get_one(tid, draft=False)
+        if not tmpl:
+            return Response(status=404)
 
         request = await request.json()
 
@@ -208,7 +210,7 @@ class ApiTemplate(_TemplateResource):
         Modify the template's metadata
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get(tid)
+            tmpl = await self.nyuki.storage.templates.get_one(tid)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
@@ -229,7 +231,7 @@ class ApiTemplate(_TemplateResource):
         Delete the template
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get(tid)
+            tmpl = await self.nyuki.storage.templates.get_one(tid)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
@@ -254,7 +256,7 @@ class ApiTemplateVersion(_TemplateResource):
         Return the template's given version
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get(tid, version, False)
+            tmpl = await self.nyuki.storage.templates.get_one(tid, version=version)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
@@ -267,7 +269,7 @@ class ApiTemplateVersion(_TemplateResource):
         Delete a template with given version
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get(tid)
+            tmpl = await self.nyuki.storage.templates.get_one(tid)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
@@ -285,33 +287,30 @@ class ApiTemplateDraft(_TemplateResource):
         Return the template's draft, if any
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get(tid, draft=True)
+            tmpl = await self.nyuki.storage.templates.get_one(tid, draft=True)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
             return Response(status=404)
 
-        return Response(tmpl[0])
+        return Response(tmpl)
 
     async def post(self, request, tid):
         """
         Publish a draft into production
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get(tid, draft=True)
+            tmpl = await self.nyuki.storage.templates.get_one(tid, draft=True)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
             return Response(status=404)
 
-        draft = {
-            **tmpl[0],
-            'draft': False
-        }
+        tmpl['draft'] = False
 
         try:
             # Set template ID from url
-            template = WorkflowTemplate.from_dict({**draft, 'draft': False})
+            template = WorkflowTemplate.from_dict(tmpl)
         except TemplateGraphError as exc:
             return Response(status=400, body={
                 'error': str(exc)
@@ -324,14 +323,14 @@ class ApiTemplateDraft(_TemplateResource):
         await self.nyuki.engine.load(template)
         # Update draft into a new template
         await self.nyuki.storage.templates.publish_draft(tid)
-        return Response(draft)
+        return Response(tmpl)
 
     async def patch(self, request, tid):
         """
         Modify the template's draft
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get(tid, draft=True)
+            tmpl = await self.nyuki.storage.templates.get_one(tid, draft=True)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
@@ -367,7 +366,7 @@ class ApiTemplateDraft(_TemplateResource):
         Delete the template's draft
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get(tid, draft=True)
+            tmpl = await self.nyuki.storage.templates.get_one(tid, draft=True)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:

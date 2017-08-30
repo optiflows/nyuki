@@ -7,7 +7,7 @@ from pymongo.errors import DuplicateKeyError
 log = logging.getLogger(__name__)
 
 
-class TemplateCollection:
+class WorkflowTemplateCollection:
 
     """
     Holds all the templates created for tukio, with their versions.
@@ -30,20 +30,21 @@ class TemplateCollection:
             [('id', DESCENDING), ('draft', DESCENDING)]
         )
 
-    async def get_all(self, full=False, latest=False, draft=False, with_metadata=True):
+    async def get_all(self, full=False, with_metadata=True):
         """
-        Return all templates, used at nyuki's startup and GET /v1/templates
-        Fetch latest versions if latest=True
-        Fetch drafts if draft=True
-        Both drafts and latest version if both are True
+        Return all latest and draft templates
+        Used at nyuki's startup and GET /v1/templates
         """
         filters = {'_id': 0}
         # '/v1/workflow/templates' does not requires all the informations
         if full is False:
             filters.update({'id': 1, 'draft': 1, 'version': 1, 'topics': 1})
 
-        cursor = self._templates.find(None, filters)
-        cursor.sort('version', DESCENDING)
+        # Retrieve only the published and the drafts
+        cursor = self._templates.find(
+            {'draft': {'$in': [True, False]}},
+            filters,
+        )
         templates = await cursor.to_list(None)
 
         # Collect metadata
@@ -53,44 +54,26 @@ class TemplateCollection:
             for template in templates:
                 template.update(metadatas[template['id']])
 
-        if latest is False and draft is False:
-            return templates
+        return templates
 
-        # Retrieve the latest versions + drafts
-        lasts = {}
-        drafts = []
-
-        for template in templates:
-            if draft and template['draft']:
-                drafts.append(template)
-            elif latest and not template['draft'] and template['id'] not in lasts:
-                lasts[template['id']] = template
-
-        return drafts + list(lasts.values())
-
-    async def get(self, tid, version=None, draft=None, with_metadata=True):
+    async def get_one(self, tid, version=None, draft=False, with_metadata=True):
         """
         Return a template's configuration and versions
         """
-        query = {'id': tid}
+        if version is not None:
+            query = {'id': tid, 'version': int(version)}
+        else:
+            query = {'id': tid, 'draft': draft}
 
-        if version:
-            query['version'] = int(version)
-        if draft is not None:
-            query['draft'] = draft
-
-        cursor = self._templates.find(query, {'_id': 0})
-        cursor.sort('version', DESCENDING)
-        templates = await cursor.to_list(None)
+        template = await self._templates.find_one(query, {'_id': 0})
 
         # Collect metadata
-        if with_metadata and templates:
+        if with_metadata and template:
             metadata = await self._storage.metadata.get_one(tid)
             if metadata:
-                for template in templates:
-                    template.update(metadata)
+                template.update(metadata)
 
-        return templates
+        return template
 
     async def get_last_version(self, tid):
         """
@@ -134,10 +117,17 @@ class TemplateCollection:
 
     async def publish_draft(self, tid):
         """
-        From draft to production
+        Set the last published template (draft: False) to None
+        Set the draft template (draft: True) to False
         """
-        query = {'id': tid, 'draft': True}
-        await self._templates.update_one(query, {'$set': {'draft': False}})
+        await self._templates.update_one(
+            {'id': tid, 'draft': False},
+            {'$set': {'draft': None}},
+        )
+        await self._templates.update_one(
+            {'id': tid, 'draft': True},
+            {'$set': {'draft': False}},
+        )
 
     async def delete(self, tid, version=None, draft=None):
         """
