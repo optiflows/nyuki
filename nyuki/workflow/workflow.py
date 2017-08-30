@@ -350,7 +350,7 @@ class WorkflowNyuki(Nyuki):
         # Retrieve full workflow templates
         wf_templates = self.engine.selector.select(efrom)
         for wftmpl in wf_templates:
-            template = await self.storage.templates.get(
+            template = await self.storage.workflow_templates.get(
                 wftmpl.uid,
                 draft=False,
                 with_metadata=True
@@ -368,7 +368,7 @@ class WorkflowNyuki(Nyuki):
         """
         self.storage.configure(**self.mongo_config)
 
-        # templates = await self.storage.templates.get_all(
+        # templates = await self.storage.workflow_templates.get_all(
         #     full=True,
         #     with_draft=False,
         #     with_metadata=False,

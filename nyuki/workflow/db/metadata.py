@@ -8,7 +8,7 @@ log = logging.getLogger(__name__)
 class MetadataCollection:
 
     def __init__(self, storage):
-        self._metadata = storage.db['metadata']
+        self._metadata = storage.db['workflow_metadata']
         asyncio.ensure_future(self.index())
 
     async def index(self):

@@ -33,7 +33,7 @@ class _TemplateResource:
         tmpl_dict = template.as_dict()
 
         # Auto-increment version, draft only
-        last_version = await self.nyuki.storage.templates.get_last_version(
+        last_version = await self.nyuki.storage.workflow_templates.get_last_version(
             template.uid
         )
         tmpl_dict['version'] = last_version + 1
@@ -49,7 +49,7 @@ class _TemplateResource:
                     match[0].update({'title': src.get('title')})
 
         try:
-            await self.nyuki.storage.templates.insert_draft(tmpl_dict)
+            await self.nyuki.storage.workflow_templates.insert_draft(tmpl_dict)
         except DuplicateKeyError as exc:
             raise DuplicateKeyError('Template already exists for this version') from exc
 
@@ -75,7 +75,7 @@ class ApiTemplates(_TemplateResource):
         Return available workflows' DAGs
         """
         try:
-            templates = await self.nyuki.storage.templates.get_all(
+            templates = await self.nyuki.storage.workflow_templates.get(
                 full=(request.GET.get('full') == '1'),
             )
         except AutoReconnect:
@@ -90,7 +90,7 @@ class ApiTemplates(_TemplateResource):
 
         if 'id' in request:
             try:
-                draft = await self.nyuki.storage.templates.get_one(
+                draft = await self.nyuki.storage.workflow_templates.get_one(
                     request['id'], draft=True
                 )
             except AutoReconnect:
@@ -151,13 +151,13 @@ class ApiTemplate(_TemplateResource):
         Return the latest version of the template
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get_one(tid)
+            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid)
         except AutoReconnect:
             return Response(status=503)
 
         if not tmpl:
             # Check if a draft is available
-            tmpl = await self.nyuki.storage.templates.get_one(tid, draft=True)
+            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid, draft=True)
             if not tmpl:
                 return Response(status=404)
 
@@ -168,7 +168,7 @@ class ApiTemplate(_TemplateResource):
         Create a new draft for this template id
         """
         try:
-            draft = await self.nyuki.storage.templates.get_one(tid, draft=True)
+            draft = await self.nyuki.storage.workflow_templates.get_one(tid, draft=True)
         except AutoReconnect:
             return Response(status=503)
         if draft:
@@ -176,7 +176,7 @@ class ApiTemplate(_TemplateResource):
                 'error': 'This draft already exists'
             })
 
-        tmpl = await self.nyuki.storage.templates.get_one(tid, draft=False)
+        tmpl = await self.nyuki.storage.workflow_templates.get_one(tid, draft=False)
         if not tmpl:
             return Response(status=404)
 
@@ -210,7 +210,7 @@ class ApiTemplate(_TemplateResource):
         Modify the template's metadata
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get_one(tid)
+            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
@@ -231,13 +231,13 @@ class ApiTemplate(_TemplateResource):
         Delete the template
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get_one(tid)
+            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
             return Response(status=404)
 
-        await self.nyuki.storage.templates.delete(tid)
+        await self.nyuki.storage.workflow_templates.delete(tid)
         await self.nyuki.storage.triggers.delete(tid)
 
         try:
@@ -256,7 +256,7 @@ class ApiTemplateVersion(_TemplateResource):
         Return the template's given version
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get_one(tid, version=version)
+            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid, version=version)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
@@ -269,13 +269,13 @@ class ApiTemplateVersion(_TemplateResource):
         Delete a template with given version
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get_one(tid)
+            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
             return Response(status=404)
 
-        await self.nyuki.storage.templates.delete(tid, version)
+        await self.nyuki.storage.workflow_templates.delete(tid, version)
         return Response(tmpl[0])
 
 
@@ -287,7 +287,7 @@ class ApiTemplateDraft(_TemplateResource):
         Return the template's draft, if any
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get_one(tid, draft=True)
+            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid, draft=True)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
@@ -300,7 +300,7 @@ class ApiTemplateDraft(_TemplateResource):
         Publish a draft into production
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get_one(tid, draft=True)
+            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid, draft=True)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
@@ -322,7 +322,7 @@ class ApiTemplateDraft(_TemplateResource):
 
         await self.nyuki.engine.load(template)
         # Update draft into a new template
-        await self.nyuki.storage.templates.publish_draft(tid)
+        await self.nyuki.storage.workflow_templates.publish_draft(tid)
         return Response(tmpl)
 
     async def patch(self, request, tid):
@@ -330,7 +330,7 @@ class ApiTemplateDraft(_TemplateResource):
         Modify the template's draft
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get_one(tid, draft=True)
+            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid, draft=True)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
@@ -366,11 +366,11 @@ class ApiTemplateDraft(_TemplateResource):
         Delete the template's draft
         """
         try:
-            tmpl = await self.nyuki.storage.templates.get_one(tid, draft=True)
+            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid, draft=True)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
             return Response(status=404)
 
-        await self.nyuki.storage.templates.delete(tid, draft=True)
+        await self.nyuki.storage.workflow_templates.delete(tid, draft=True)
         return Response(tmpl[0])

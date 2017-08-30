@@ -18,7 +18,7 @@ class WorkflowTemplateCollection:
 
     def __init__(self, storage):
         self._storage = storage
-        self._templates = storage.db['templates']
+        self._templates = storage.db['workflow_templates']
         asyncio.ensure_future(self.index())
 
     async def index(self):
@@ -30,7 +30,7 @@ class WorkflowTemplateCollection:
             [('id', DESCENDING), ('draft', DESCENDING)]
         )
 
-    async def get_all(self, full=False, with_metadata=True):
+    async def get(self, full=False, with_metadata=True):
         """
         Return all latest and draft templates
         Used at nyuki's startup and GET /v1/templates
@@ -73,6 +73,11 @@ class WorkflowTemplateCollection:
             if metadata:
                 template.update(metadata)
 
+        if template:
+            template['tasks'] = await self._storage.task_templates.get(
+                template['tasks'], template['version']
+            )
+
         return template
 
     async def get_last_version(self, tid):
@@ -80,28 +85,8 @@ class WorkflowTemplateCollection:
         Return the highest version of a template
         """
         query = {'id': tid, 'draft': False}
-        cursor = self._templates.find(query)
-        cursor.sort('version', DESCENDING)
-        await cursor.fetch_next
-
-        template = cursor.next_object()
+        template = await self._templates.find_one(query)
         return template['version'] if template else 0
-
-    async def insert(self, template):
-        """
-        Insert a template dict, not updatable
-        """
-        query = {
-            'id': template['id'],
-            'version': template['version']
-        }
-
-        # Remove draft if any
-        await self.delete(template['id'], template['version'], True)
-
-        log.info('Insert template with query: %s', query)
-        # Copy dict, mongo somehow alter the given dict
-        await self._templates.insert_one(template.copy())
 
     async def insert_draft(self, template):
         """
@@ -111,6 +96,14 @@ class WorkflowTemplateCollection:
             'id': template['id'],
             'draft': True
         }
+
+        # Insert tasks
+        task_ids = []
+        for task in template['tasks']:
+            task['version'] = template['version']
+            await self._storage.task_templates.insert(task)
+            task_ids.append(task['id'])
+        template['tasks'] = task_ids
 
         log.info('Update draft for query: %s', query)
         await self._templates.replace_one(query, template, upsert=True)

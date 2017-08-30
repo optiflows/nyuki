@@ -7,6 +7,7 @@ from .triggers import TriggerCollection
 from .data_processing import DataProcessingCollection
 from .metadata import MetadataCollection
 from .workflow_templates import WorkflowTemplateCollection
+from .task_templates import TaskTemplateCollection
 from .workflow_instances import WorkflowInstanceCollection
 from .task_instances import TaskInstanceCollection
 
@@ -39,7 +40,8 @@ class MongoStorage:
         log.info("Workflow database: '%s'", db_name)
 
         # Collections
-        self.templates = WorkflowTemplateCollection(self)
+        self.workflow_templates = WorkflowTemplateCollection(self)
+        self.task_templates = TaskTemplateCollection(self)
         self.regexes = DataProcessingCollection(self, 'regexes')
         self.lookups = DataProcessingCollection(self, 'lookups')
         self.triggers = TriggerCollection(self)

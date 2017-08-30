@@ -28,7 +28,7 @@ class DataInspector(object):
 
     async def required_keys(self, tid, version=None, draft=False):
         try:
-            template = await self.nyuki.storage.templates.get_one(
+            template = await self.nyuki.storage.workflow_templates.get_one(
                 tid=tid, version=version, draft=draft
             )
         except AutoReconnect:
