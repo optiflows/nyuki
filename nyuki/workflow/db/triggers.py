@@ -9,7 +9,10 @@ class TriggerCollection:
 
     def __init__(self, storage):
         self._triggers = storage.db['triggers']
-        asyncio.ensure_future(self._triggers.create_index('tid', unique=True))
+        asyncio.ensure_future(self.index())
+
+    async def index(self):
+        await self._triggers.create_index('tid', unique=True)
 
     async def get_all(self):
         """
@@ -22,16 +25,14 @@ class TriggerCollection:
         """
         Return the trigger form of a given workflow template id
         """
-        cursor = self._triggers.find({'tid': template_id}, {'_id': 0})
-        await cursor.fetch_next
-        return cursor.next_object()
+        return await self._triggers.find_one({'tid': template_id}, {'_id': 0})
 
     async def insert(self, tid, form):
         """
         Insert a trigger form for the given workflow template
         """
         data = {'tid': tid, 'form': form}
-        await self._triggers.update({'tid': tid}, data, upsert=True)
+        await self._triggers.replace_one({'tid': tid}, data, upsert=True)
         return data
 
     async def delete(self, template_id=None):
