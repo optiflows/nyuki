@@ -39,4 +39,4 @@ class TriggerCollection:
         Delete a trigger form
         """
         query = {'tid': template_id} if template_id is not None else None
-        await self._triggers.remove(query)
+        await self._triggers.delete_one(query)

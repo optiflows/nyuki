@@ -11,20 +11,18 @@ class DataProcessingCollection:
         self._rules = storage.db[collection_name]
         asyncio.ensure_future(self._rules.create_index('id', unique=True))
 
-    async def get_all(self):
+    async def get(self):
         """
         Return a list of all rules
         """
         cursor = self._rules.find(None, {'_id': 0})
         return await cursor.to_list(None)
 
-    async def get(self, rule_id):
+    async def get_one(self, rule_id):
         """
         Return the rule for given id or None
         """
-        cursor = self._rules.find({'id': rule_id}, {'_id': 0})
-        await cursor.fetch_next
-        return cursor.next_object()
+        return await self._rules.find_one({'id': rule_id}, {'_id': 0})
 
     async def insert(self, data):
         """
@@ -43,7 +41,7 @@ class DataProcessingCollection:
             self._rules.name
         )
         log.debug('upserting data: %s', data)
-        await self._rules.update(query, data, upsert=True)
+        await self._rules.replace_one(query, data, upsert=True)
 
     async def delete(self, rule_id=None):
         """
@@ -52,4 +50,4 @@ class DataProcessingCollection:
         query = {'id': rule_id} if rule_id is not None else None
         log.info("Removing rule(s) from collection '%s'", self._rules.name)
         log.debug('delete query: %s', query)
-        await self._rules.remove(query)
+        await self._rules.delete_one(query)

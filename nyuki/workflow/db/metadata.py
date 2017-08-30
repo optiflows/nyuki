@@ -44,7 +44,7 @@ class MetadataCollection:
             'tags': metadata.get('tags', [])
         }
 
-        await self._metadata.update_one(query, metadata, upsert=True)
+        await self._metadata.replace_one(query, metadata, upsert=True)
         log.info(
             'Inserted metadata for template %s (%s)',
             metadata['id'][:8], metadata['title'],
@@ -55,4 +55,4 @@ class MetadataCollection:
         """
         Delete metadata for one template.
         """
-        await self._metadata.remove({'id': tid})
+        await self._metadata.delete_one({'id': tid})

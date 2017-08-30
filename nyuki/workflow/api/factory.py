@@ -38,7 +38,7 @@ class ApiFactoryRegexes:
         Return the list of all regexes
         """
         try:
-            regexes = await self.nyuki.storage.regexes.get_all()
+            regexes = await self.nyuki.storage.regexes.get()
         except AutoReconnect:
             return Response(status=503)
         return Response(regexes)
@@ -72,7 +72,7 @@ class ApiFactoryRegexes:
         Delete all regexes and return the list
         """
         try:
-            rules = await self.nyuki.storage.regexes.get_all()
+            rules = await self.nyuki.storage.regexes.get()
         except AutoReconnect:
             return Response(status=503)
         await self.nyuki.storage.regexes.delete()
@@ -87,7 +87,7 @@ class ApiFactoryRegex:
         Return the regex for id `regex_id`
         """
         try:
-            regex = await self.nyuki.storage.regexes.get(regex_id)
+            regex = await self.nyuki.storage.regexes.get_one(regex_id)
         except AutoReconnect:
             return Response(status=503)
         if not regex:
@@ -99,7 +99,7 @@ class ApiFactoryRegex:
         Modify an existing regex
         """
         try:
-            regex = await self.nyuki.storage.regexes.get(regex_id)
+            regex = await self.nyuki.storage.regexes.get_one(regex_id)
         except AutoReconnect:
             return Response(status=503)
         if not regex:
@@ -125,7 +125,7 @@ class ApiFactoryRegex:
         Delete the regex with id `regex_id`
         """
         try:
-            regex = await self.nyuki.storage.regexes.get(regex_id)
+            regex = await self.nyuki.storage.regexes.get_one(regex_id)
         except AutoReconnect:
             return Response(status=503)
         if not regex:
@@ -171,7 +171,7 @@ class ApiFactoryLookups:
         Return the list of all lookups
         """
         try:
-            lookups = await self.nyuki.storage.lookups.get_all()
+            lookups = await self.nyuki.storage.lookups.get()
         except AutoReconnect:
             return Response(status=503)
         return Response(lookups)
@@ -256,7 +256,7 @@ class ApiFactoryLookups:
         Delete all lookups and return the list
         """
         try:
-            lookups = await self.nyuki.storage.lookups.get_all()
+            lookups = await self.nyuki.storage.lookups.get()
         except AutoReconnect:
             return Response(status=503)
         await self.nyuki.storage.lookups.delete()
@@ -271,7 +271,7 @@ class ApiFactoryLookup:
         Return the lookup table for id `lookup_id`
         """
         try:
-            lookup = await self.nyuki.storage.lookups.get(lookup_id)
+            lookup = await self.nyuki.storage.lookups.get_one(lookup_id)
         except AutoReconnect:
             return Response(status=503)
         if not lookup:
@@ -283,7 +283,7 @@ class ApiFactoryLookup:
         Modify an existing lookup table
         """
         try:
-            lookup = await self.nyuki.storage.lookups.get(lookup_id)
+            lookup = await self.nyuki.storage.lookups.get_one(lookup_id)
         except AutoReconnect:
             return Response(status=503)
         if not lookup:
@@ -303,7 +303,7 @@ class ApiFactoryLookup:
         Delete the lookup table with id `lookup_id`
         """
         try:
-            lookup = await self.nyuki.storage.lookups.get(lookup_id)
+            lookup = await self.nyuki.storage.lookups.get_one(lookup_id)
         except AutoReconnect:
             return Response(status=503)
         if not lookup:
@@ -321,7 +321,7 @@ class ApiFactoryLookupCSV:
         Return the lookup table for id `lookup_id`
         """
         try:
-            lookup = await self.nyuki.storage.lookups.get(lookup_id)
+            lookup = await self.nyuki.storage.lookups.get_one(lookup_id)
         except AutoReconnect:
             return Response(status=503)
         if not lookup:

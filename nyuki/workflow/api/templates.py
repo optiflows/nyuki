@@ -10,14 +10,6 @@ from nyuki.workflow.validation import validate, TemplateError
 log = logging.getLogger(__name__)
 
 
-class ConflictError(Exception):
-    pass
-
-
-class DuplicateTemplateError(Exception):
-    pass
-
-
 @resource('/workflow/tasks', versions=['v1'])
 class ApiTasks:
 
@@ -58,8 +50,8 @@ class _TemplateResource:
 
         try:
             await self.nyuki.storage.templates.insert_draft(tmpl_dict)
-        except DuplicateTemplateError as exc:
-            raise ConflictError('Template already exists for this version') from exc
+        except DuplicateKeyError as exc:
+            raise DuplicateKeyError('Template already exists for this version') from exc
 
         return tmpl_dict
 
@@ -141,7 +133,7 @@ class ApiTemplates(_TemplateResource):
 
         try:
             tmpl_dict = await self.update_draft(template, request)
-        except ConflictError as exc:
+        except DuplicateKeyError as exc:
             return Response(status=409, body={
                 'error': exc
             })
@@ -198,7 +190,7 @@ class ApiTemplate(_TemplateResource):
 
         try:
             tmpl_dict = await self.update_draft(template, request)
-        except ConflictError as exc:
+        except DuplicateKeyError as exc:
             return Response(status=409, body={
                 'error': exc
             })
@@ -357,7 +349,7 @@ class ApiTemplateDraft(_TemplateResource):
 
         try:
             tmpl_dict = await self.update_draft(template, request)
-        except ConflictError as exc:
+        except DuplicateKeyError as exc:
             return Response(status=409, body={
                 'error': str(exc)
             })

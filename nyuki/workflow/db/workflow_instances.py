@@ -2,11 +2,13 @@ import re
 import asyncio
 import logging
 from enum import Enum
-from pymongo import DESCENDING, ASCENDING
 from datetime import datetime, timezone
 from bson.codec_options import CodecOptions
+from pymongo import DESCENDING, ASCENDING
+from pymongo.errors import DuplicateKeyError
 
-from nyuki.workflow.db import storage
+
+log = logging.getLogger(__name__)
 
 
 class Ordering(Enum):

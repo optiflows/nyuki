@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from pymongo import DESCENDING
+from pymongo.errors import DuplicateKeyError
 
 
 log = logging.getLogger(__name__)
@@ -116,11 +117,8 @@ class TemplateCollection:
         await self.delete(template['id'], template['version'], True)
 
         log.info('Insert template with query: %s', query)
-        try:
-            # Copy dict, mongo somehow alter the given dict
-            await self._templates.insert(template.copy())
-        except DuplicateKeyError as exc:
-            raise DuplicateTemplateError from exc
+        # Copy dict, mongo somehow alter the given dict
+        await self._templates.insert_one(template.copy())
 
     async def insert_draft(self, template):
         """
@@ -131,18 +129,15 @@ class TemplateCollection:
             'draft': True
         }
 
-        try:
-            log.info('Update draft for query: %s', query)
-            await self._templates.update(query, template, upsert=True)
-        except DuplicateKeyError as exc:
-            raise DuplicateTemplateError from exc
+        log.info('Update draft for query: %s', query)
+        await self._templates.replace_one(query, template, upsert=True)
 
     async def publish_draft(self, tid):
         """
         From draft to production
         """
         query = {'id': tid, 'draft': True}
-        await self._templates.update(query, {'$set': {'draft': False}})
+        await self._templates.update_one(query, {'$set': {'draft': False}})
 
     async def delete(self, tid, version=None, draft=None):
         """
@@ -156,7 +151,7 @@ class TemplateCollection:
 
         log.info("Removing template(s) with query: %s", query)
 
-        await self._templates.remove(query)
+        await self._templates.delete_many(query)
         left = await self._templates.find({'id': tid}).count()
         if not left:
             await self._storage.metadata.delete(tid)
