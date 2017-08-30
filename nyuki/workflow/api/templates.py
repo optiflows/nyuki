@@ -26,7 +26,7 @@ class _TemplateResource:
     Share methods between templates resources
     """
 
-    async def update_draft(self, template, from_request=None):
+    async def update_draft(self, template, from_request):
         """
         Helper to insert/update a draft
         """
@@ -40,20 +40,21 @@ class _TemplateResource:
         tmpl_dict['draft'] = True
 
         # Store task extra info (ie. title)
-        if from_request is not None:
-            rqst_tasks = from_request.get('tasks', [])
-            tmpl_tasks = tmpl_dict['tasks']
-            for src in rqst_tasks:
-                match = list(filter(lambda t: t['id'] == src['id'], tmpl_tasks))
-                if match:
-                    match[0].update({'title': src.get('title')})
+        rqst_tasks = from_request.get('tasks', [])
+        tmpl_tasks = tmpl_dict['tasks']
+        for src in rqst_tasks:
+            match = list(filter(lambda t: t['id'] == src['id'], tmpl_tasks))
+            if match:
+                match[0].update({'title': src.get('title')})
 
         try:
-            await self.nyuki.storage.workflow_templates.insert_draft(tmpl_dict)
+            template = await self.nyuki.storage.workflow_templates.insert_draft(
+                tmpl_dict
+            )
         except DuplicateKeyError as exc:
             raise DuplicateKeyError('Template already exists for this version') from exc
 
-        return tmpl_dict
+        return template
 
     def errors_from_validation(self, template):
         """

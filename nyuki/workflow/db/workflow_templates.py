@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from copy import deepcopy
 from pymongo import DESCENDING
 from pymongo.errors import DuplicateKeyError
 
@@ -14,6 +15,18 @@ class WorkflowTemplateCollection:
     These records will be used to ensure a persistence of created workflows
     in case the nyuki get into trouble.
     Templates are retrieved and loaded at startup.
+
+    {
+        "id": <uuid4>,
+        "policy": <str><,
+        "topics": [<str>],
+        "graph": {},
+        "title": <str>,
+        "tags": [<str>],
+        "version": <int>,
+        "draft": <null | false | true>,
+        "scheme": <int>
+    }
     """
 
     def __init__(self, storage):
@@ -75,7 +88,7 @@ class WorkflowTemplateCollection:
 
         if template:
             template['tasks'] = await self._storage.task_templates.get(
-                template['tasks'], template['version']
+                template['id'], template['version']
             )
 
         return template
@@ -98,15 +111,18 @@ class WorkflowTemplateCollection:
         }
 
         # Insert tasks
-        task_ids = []
-        for task in template['tasks']:
-            task['version'] = template['version']
+        to_insert = deepcopy(template)
+        for task in to_insert['tasks']:
+            task['workflow_template'] = {
+                'id': template['id'],
+                'version': template['version'],
+            }
             await self._storage.task_templates.insert(task)
-            task_ids.append(task['id'])
-        template['tasks'] = task_ids
+        del to_insert['tasks']
 
         log.info('Update draft for query: %s', query)
-        await self._templates.replace_one(query, template, upsert=True)
+        await self._templates.replace_one(query, to_insert, upsert=True)
+        return template
 
     async def publish_draft(self, tid):
         """
