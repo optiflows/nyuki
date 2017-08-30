@@ -321,7 +321,6 @@ class ApiTemplateDraft(_TemplateResource):
         if errors is not None:
             return Response(status=400, body=errors)
 
-        await self.nyuki.engine.load(template)
         # Update draft into a new template
         await self.nyuki.storage.workflow_templates.publish_draft(tid)
         return Response(tmpl)

@@ -35,6 +35,7 @@ from .api.vars import (
 
 from .tasks import *
 from .tasks.utils import runtime, CONTACT_PROGRESS
+from .tukio import WorkflowSelector
 
 
 log = logging.getLogger(__name__)
@@ -220,8 +221,9 @@ class WorkflowNyuki(Nyuki):
         return self.config.get('topics', [])
 
     async def setup(self):
-        self.engine = Engine(loop=self.loop)
-        asyncio.ensure_future(self.reload_from_storage())
+        self.storage.configure(**self.mongo_config)
+        selector = WorkflowSelector(self.storage)
+        self.engine = Engine(selector=selector, loop=self.loop)
         for topic in self.topics:
             asyncio.ensure_future(self.bus.subscribe(
                 topic, self.workflow_event
@@ -233,7 +235,7 @@ class WorkflowNyuki(Nyuki):
             self.raft.register('failures', self.failure_handler)
 
     async def reload(self):
-        asyncio.ensure_future(self.reload_from_storage())
+        self.storage.configure(**self.mongo_config)
 
     async def teardown(self):
         if self.engine:
@@ -344,42 +346,21 @@ class WorkflowNyuki(Nyuki):
     async def workflow_event(self, efrom, data):
         """
         New bus event received, trigger workflows if needed.
-        TODO: Fetch topics from DB on-the-go
         """
         templates = {}
         # Retrieve full workflow templates
-        wf_templates = self.engine.selector.select(efrom)
+        wf_templates = await self.engine.selector.select(efrom)
         for wftmpl in wf_templates:
-            template = await self.storage.workflow_templates.get(
+            template = await self.storage.workflow_templates.get_one(
                 wftmpl.uid,
                 draft=False,
                 with_metadata=True
             )
-            templates[wftmpl.uid] = template[0]
+            templates[wftmpl.uid] = template
         # Trigger workflows
         instances = await self.engine.data_received(data, efrom)
         for instance in instances:
             self.new_workflow(templates[instance.template.uid], instance)
-
-    async def reload_from_storage(self):
-        """
-        Check mongo, retrieve and load all templates
-        TODO: Fetch topics from DB on-the-go
-        """
-        self.storage.configure(**self.mongo_config)
-
-        # templates = await self.storage.workflow_templates.get_all(
-        #     full=True,
-        #     with_draft=False,
-        #     with_metadata=False,
-        # )
-
-        # for template in templates:
-        #     try:
-        #         await self.engine.load(WorkflowTemplate.from_dict(template))
-        #     except Exception as exc:
-        #         # Means a bad workflow is in database, report it
-        #         reporting.exception(exc)
 
     @memsafe
     async def failure_handler(self, instances):

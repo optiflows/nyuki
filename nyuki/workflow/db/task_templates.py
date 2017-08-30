@@ -45,7 +45,10 @@ class TaskTemplateCollection:
                 'workflow_template.id': workflow_id,
                 'workflow_template.version': version
             },
-            {'_id': 0},
+            {
+                '_id': 0,
+                'workflow_template': 0,
+            },
         )
         return await cursor.to_list(None)
 

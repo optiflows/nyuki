@@ -35,6 +35,7 @@ class WorkflowTemplateCollection:
         asyncio.ensure_future(self.index())
 
     async def index(self):
+        await self._templates.create_index('topics')
         await self._templates.create_index(
             [('id', DESCENDING), ('version', DESCENDING)],
             unique=True
@@ -92,6 +93,23 @@ class WorkflowTemplateCollection:
             )
 
         return template
+
+    async def get_for_topic(self, topic):
+        """
+        Return the latest templates (non-draft) that wait
+        for a certain topic.
+        """
+        query = {'topics': topic, 'draft': False}
+        cursor = self._templates.find(query, {'_id': 0})
+        templates = await cursor.to_list(None)
+
+        # TODO: Less mongo requests
+        for template in templates:
+            template['tasks'] = await self._storage.task_templates.get(
+                template['id'], template['version']
+            )
+
+        return templates
 
     async def get_last_version(self, tid):
         """
