@@ -1,8 +1,5 @@
-import re
 import asyncio
 import logging
-from enum import Enum
-from uuid import uuid4
 from aiohttp.web import FileField
 from tukio import get_broker, EXEC_TOPIC
 from tukio.utils import FutureState
@@ -11,9 +8,10 @@ from tukio.workflow import (
 )
 from pymongo.errors import AutoReconnect
 
-from nyuki.utils import from_isoformat
 from nyuki.api import Response, resource, content_type, HTTPBreak
+from nyuki.utils import from_isoformat
 from nyuki.workflow.tasks.utils.uri import URI, InvalidWorkflowUri
+from nyuki.workflow.db.workflow_instances import Ordering
 
 
 log = logging.getLogger(__name__)
@@ -340,7 +338,7 @@ class ApiWorkflowsHistory:
                 })
 
         try:
-            count, history = await self.nyuki.storage.instances.get(
+            count, history = await self.nyuki.storage.workflow_instances.get(
                 root=(request.GET.get('root') == '1'),
                 full=(request.GET.get('full') == '1'),
                 search=request.GET.get('search'),
@@ -359,7 +357,7 @@ class ApiWorkflowHistory:
 
     async def get(self, request, uid):
         try:
-            workflow = await self.nyuki.storage.instances.get_one(
+            workflow = await self.nyuki.storage.workflow_instances.get_one(
                 uid, (request.GET.get('full') == '1')
             )
         except AutoReconnect:

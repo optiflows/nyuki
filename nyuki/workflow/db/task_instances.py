@@ -13,18 +13,18 @@ class TaskInstancesCollection:
     TASK_HISTORY_FILTERS = {
         '_id': 0,
         # Tasks
-        'id': 1,
-        'name': 1,
-        'config': 1,
-        'topics': 1,
-        'title': 1,
+        'template.id': 1,
+        'template.name': 1,
+        'template.config': 1,
+        'template.topics': 1,
+        'template.title': 1,
         # Exec
-        'exec.id': 1,
-        'exec.start': 1,
-        'exec.end': 1,
-        'exec.state': 1,
+        'id': 1,
+        'start': 1,
+        'end': 1,
+        'state': 1,
         # Graph-specific data fields
-        **{'exec.outputs.{}'.format(key): 1 for key in WS_FILTERS}
+        **{'outputs.{}'.format(key): 1 for key in WS_FILTERS}
     }
 
     def __init__(self, storage):
@@ -36,8 +36,8 @@ class TaskInstancesCollection:
         asyncio.ensure_future(self.index())
 
     async def index(self):
+        await self._instances.create_index('id')
         await self._instances.create_index('workflow_exec_id')
-        await self._instances.create_index('exec.id')
 
     async def get(self, wid, full=False):
         """
@@ -55,26 +55,26 @@ class TaskInstancesCollection:
         Return one task instance.
         """
         if full is False:
-            filters = {'_id': 0, 'exec.inputs': 0, 'exec.outputs': 0}
+            filters = {'_id': 0, 'inputs': 0, 'outputs': 0}
         else:
             filters = {'_id': 0}
-        return await self._instances.find_one({'exec.id': tid}, filters)
+        return await self._instances.find_one({'id': tid}, filters)
 
     async def get_data(self, tid):
         """
         Return the data (inputs/outputs) of one executed task.
         """
         task = await self._instances.find_one(
-            {'exec.id': tid},
-            {'_id': 0, 'exec.inputs': 1, 'exec.outputs': 1},
+            {'id': tid},
+            {'_id': 0, 'inputs': 1, 'outputs': 1},
         )
         return {
-            'inputs': task['exec']['inputs'],
-            'outputs': task['exec']['outputs'],
+            'inputs': task['inputs'],
+            'outputs': task['outputs'],
         } if task else None
 
-    async def insert(self, task):
+    async def insert_many(self, tasks):
         """
         Insert a finished workflow task.
         """
-        await self._instances.insert(task)
+        await self._instances.insert_many(tasks)

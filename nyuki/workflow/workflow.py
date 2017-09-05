@@ -138,6 +138,28 @@ class WorkflowInstance:
         result['tasks'] = list(tasks.values())
         return result
 
+    def to_database(self, report):
+        # Base workflow exec details
+        workflow = report['exec']
+        del report['exec']
+
+        tasks = report['tasks']
+        del report['tasks']
+
+        workflow['template'] = report
+
+        db_tasks = []
+        for task in tasks:
+            task_exec = task['exec']
+            del task['exec']
+            db_tasks.append({
+                **task_exec,
+                'workflow_exec_id': workflow['id'],
+                'template': task,
+            })
+
+        return workflow, db_tasks
+
 
 class WorkflowNyuki(Nyuki):
 
@@ -325,8 +347,13 @@ class WorkflowNyuki(Nyuki):
             WorkflowExecState.ERROR.value
         ]:
             # Sanitize objects to store the finished workflow instance
+            end_report = sanitize_workflow_exec(wflow.report())
+            end_wflow, end_tasks = wflow.to_database(end_report)
             asyncio.ensure_future(self.storage.workflow_instances.insert(
-                sanitize_workflow_exec(wflow.report())
+                end_wflow
+            ))
+            asyncio.ensure_future(self.storage.task_instances.insert_many(
+                end_tasks
             ))
             del self.running_workflows[exec_id]
             memwrite = False

@@ -14,12 +14,12 @@ log = logging.getLogger(__name__)
 
 class Ordering(Enum):
 
-    title_asc = ('title', ASCENDING)
-    title_desc = ('title', DESCENDING)
-    start_asc = ('exec.start', ASCENDING)
-    start_desc = ('exec.start', DESCENDING)
-    end_asc = ('exec.end', ASCENDING)
-    end_desc = ('exec.end', DESCENDING)
+    title_asc = ('template.title', ASCENDING)
+    title_desc = ('template.title', DESCENDING)
+    start_asc = ('start', ASCENDING)
+    start_desc = ('start', DESCENDING)
+    end_asc = ('end', ASCENDING)
+    end_desc = ('end', DESCENDING)
 
     @classmethod
     def keys(cls):
@@ -41,23 +41,23 @@ class WorkflowInstancesCollection:
 
     async def index(self):
         # Workflow
-        await self._instances.create_index('exec.id', unique=True)
-        await self._instances.create_index('exec.state')
-        await self._instances.create_index('exec.requester')
+        await self._instances.create_index('id', unique=True)
+        await self._instances.create_index('state')
+        await self._instances.create_index('requester')
         # Search and sorting indexes
-        await self._instances.create_index('title')
-        await self._instances.create_index('exec.start')
-        await self._instances.create_index('exec.end')
+        await self._instances.create_index('template.title')
+        await self._instances.create_index('start')
+        await self._instances.create_index('end')
 
     async def get_one(self, exec_id, full=False):
         """
         Return the instance with `exec_id` from workflow history.
         """
         workflow = await self._instances.find_one(
-            {'exec.id': exec_id}, {'_id': 0}
+            {'id': exec_id}, {'_id': 0}
         )
         if workflow:
-            workflow['tasks'] = await self._storage.task_instances.get(exec_id, full)
+            workflow['template']['tasks'] = await self._storage.task_instances.get(exec_id, full)
         return workflow
 
     async def get(self, root=False, full=False, offset=None, limit=None,
@@ -68,26 +68,15 @@ class WorkflowInstancesCollection:
         query = {}
         # Prepare query
         if isinstance(since, datetime):
-            query['exec.start'] = {'$gte': since}
+            query['start'] = {'$gte': since}
         if isinstance(state, Enum):
-            query['exec.state'] = state.value
+            query['state'] = state.value
         if root is True:
-            query['exec.requester'] = {'$not': self.REQUESTER_REGEX}
+            query['requester'] = {'$not': self.REQUESTER_REGEX}
         if search:
-            query['title'] = {'$regex': '.*{}.*'.format(search)}
+            query['template.title'] = {'$regex': '.*{}.*'.format(search)}
 
-        if full is False:
-            fields = {
-                '_id': 0,
-                'title': 1,
-                'exec': 1,
-                'id': 1,
-                'version': 1,
-                'draft': 1
-            }
-        else:
-            fields = {'_id': 0}
-
+        fields = {'_id': 0}
         cursor = self._instances.find(query, fields)
         # Count total results regardless of limit/offset
         count = await cursor.count()
@@ -109,8 +98,8 @@ class WorkflowInstancesCollection:
         workflows = await cursor.to_list(None)
         if full is True:
             for workflow in workflows:
-                workflow['tasks'] = await self._storage.task_instances.get(
-                    workflow['exec']['id'], True
+                workflow['template']['tasks'] = await self._storage.task_instances.get(
+                    workflow['id'], True
                 )
         return count, workflows
 
@@ -118,16 +107,10 @@ class WorkflowInstancesCollection:
         """
         Insert a finished workflow report into the workflow history.
         """
-        # Split tasks exec and workflow exec.
-        for task in workflow['tasks']:
-            task['workflow_exec_id'] = workflow['exec']['id']
-            await self._storage.task_instances.insert(task)
-        del workflow['tasks']
-
         try:
             await self._instances.insert(workflow)
         except DuplicateKeyError:
             # If it's a duplicate, we don't want to lose it
-            workflow['exec']['duplicate'] = workflow['exec']['id']
-            workflow['exec']['id'] = str(uuid4())
+            workflow['duplicate'] = workflow['id']
+            workflow['id'] = str(uuid4())
             await self._instances.insert(workflow)
