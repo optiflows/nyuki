@@ -47,6 +47,8 @@ class MongoStorage:
         self._workflow_instances = WorkflowInstancesCollection(self._db)
         self._task_instances = TaskInstancesCollection(self._db)
 
+    # Templates
+
     async def update_metadata(self, tid, metadata):
         """
         Update and return
@@ -150,3 +152,46 @@ class MongoStorage:
             await self._task_templates.delete_many(tid)
             await self._metadata.delete(tid)
             await self._triggers.delete(tid)
+
+    # Instances
+
+    async def insert_instance(self, instance):
+        """
+        Insert a static workflow instance and all its tasks.
+        """
+        task_instances = []
+        for task in instance['template']['tasks']:
+            task_instances.append({
+                **task,
+                'workflow_exec_id': instance['id'],
+            })
+        del instance['template']['tasks']
+        await self._task_instances.insert_many(task_instances)
+        await self._workflow_instances.insert(instance)
+
+    # History
+
+    async def get_history(self, **kwargs):
+        """
+        Return paginated workflow history.
+        """
+        count, workflows = await self._workflow_instances.get(**kwargs)
+        if kwargs.get('full') is True:
+            for workflow in workflows:
+                workflow['template']['tasks'] = await self._task_instances.get(
+                    workflow['id'], True
+                )
+        return count, workflows
+
+    async def get_instance(self, instance_id, full=False):
+        workflow = await self._workflow_instances.get_one(instance_id, full)
+        workflow['template']['tasks'] = await self._task_instances.get(
+            workflow['id'], full
+        )
+        return workflow
+
+    async def get_instance_task(self, task_id, full=False):
+        return await self._task_instances.get_one(task_id, full)
+
+    async def get_instance_task_data(self, task_id):
+        return await self._task_instances.get_data(task_id)

@@ -338,7 +338,7 @@ class ApiWorkflowsHistory:
                 })
 
         try:
-            count, history = await self.nyuki.storage.workflow_instances.get(
+            count, history = await self.nyuki.storage.get_history(
                 root=(request.GET.get('root') == '1'),
                 full=(request.GET.get('full') == '1'),
                 search=request.GET.get('search'),
@@ -357,7 +357,7 @@ class ApiWorkflowHistory:
 
     async def get(self, request, uid):
         try:
-            workflow = await self.nyuki.storage.workflow_instances.get_one(
+            workflow = await self.nyuki.storage.get_instance(
                 uid, (request.GET.get('full') == '1')
             )
         except AutoReconnect:
@@ -372,7 +372,7 @@ class ApiWorkflowHistoryTask:
 
     async def get(self, request, uid, task_id):
         try:
-            task = await self.nyuki.storage.instances.get_task(
+            task = await self.nyuki.storage.get_instance_task(
                 task_id, (request.GET.get('full') == '1')
             )
         except AutoReconnect:
@@ -387,7 +387,7 @@ class ApiWorkflowHistoryTaskData:
 
     async def get(self, request, uid, task_id):
         try:
-            task = await self.nyuki.storage.instances.get_task_data(task_id)
+            task = await self.nyuki.storage.get_instance_task_data(task_id)
         except AutoReconnect:
             return Response(status=503)
         if not task:

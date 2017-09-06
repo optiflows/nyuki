@@ -3,6 +3,8 @@ import asyncio
 import logging
 import pickle
 import aiohttp
+from uuid import uuid4
+from copy import deepcopy
 from random import shuffle
 from datetime import datetime
 from tukio import Engine, TaskRegistry, get_broker, EXEC_TOPIC
@@ -23,7 +25,7 @@ from .api.factory import (
 from .api.templates import (
     ApiTasks, ApiTemplates, ApiTemplate, ApiTemplateVersion, ApiTemplateDraft
 )
-from .api.workflows import (
+from .api.instances import (
     ApiWorkflow, ApiWorkflows, ApiWorkflowsHistory, ApiWorkflowHistory,
     ApiWorkflowTriggers, ApiWorkflowTrigger, ApiWorkflowHistoryTask,
     ApiWorkflowHistoryTaskData, ApiTaskReporting, ApiTaskReportingContact,
@@ -105,60 +107,51 @@ class WorkflowInstance:
         """
         Merge a workflow exec instance report and its template.
         """
-        template = self._template.copy()
+        template = deepcopy(self._template)
         inst = self._instance.report()
         inst['exec'].update(self._exec)
 
         result = {
-            **self._template,
-            'exec': inst['exec'],
+            **inst['exec'],
+            'template': template,
         }
 
         if tasks is False:
-            del result['graph']
-            del result['tasks']
+            del result['template']['graph']
+            del result['template']['tasks']
             return result
 
-        tasks = {task['id']: task for task in template['tasks']}
-        for task in inst['tasks']:
+        tasks = {task['id']: {'template': task} for task in template['tasks']}
+        for task_dict in inst['tasks']:
+            if not task_dict.get('exec'):
+                # Task was never started, create dummy exec dict.
+                task_dict['exec'] = {
+                    'id': str(uuid4()),
+                    'start': None,
+                    'end': None,
+                    'state': 'not-started',
+                    'inputs': None,
+                    'outputs': None,
+                    'reporting': None
+                }
+
             # Filter out reporting/data if not necessary
-            if task.get('exec') and data is False:
-                del task['exec']['reporting']
-                del task['exec']['inputs']
+            if data is False:
+                del task_dict['exec']['reporting']
+                del task_dict['exec']['inputs']
                 # Leave the necessary task-end informations available
-                if task['exec']['outputs']:
-                    task['exec']['outputs'] = {
-                        key: task['exec']['outputs'][key]
+                if task_dict['exec']['outputs']:
+                    task_dict['exec']['outputs'] = {
+                        key: task_dict['exec']['outputs'][key]
                         for key in WS_FILTERS
-                        if key in task['exec']['outputs']
+                        if key in task_dict['exec']['outputs']
                     }
-            # Stored template contains more info than tukio's (title...),
-            # so we add it to the report.
-            tasks[task['id']].update(**task)
-        result['tasks'] = list(tasks.values())
+
+            # Add execution informations to each task.
+            tasks[task_dict['id']].update(task_dict['exec'])
+
+        result['template']['tasks'] = list(tasks.values())
         return result
-
-    def to_database(self, report):
-        # Base workflow exec details
-        workflow = report['exec']
-        del report['exec']
-
-        tasks = report['tasks']
-        del report['tasks']
-
-        workflow['template'] = report
-
-        db_tasks = []
-        for task in tasks:
-            task_exec = task['exec']
-            del task['exec']
-            db_tasks.append({
-                **task_exec,
-                'workflow_exec_id': workflow['id'],
-                'template': task,
-            })
-
-        return workflow, db_tasks
 
 
 class WorkflowNyuki(Nyuki):
@@ -347,13 +340,8 @@ class WorkflowNyuki(Nyuki):
             WorkflowExecState.ERROR.value
         ]:
             # Sanitize objects to store the finished workflow instance
-            end_report = sanitize_workflow_exec(wflow.report())
-            end_wflow, end_tasks = wflow.to_database(end_report)
-            asyncio.ensure_future(self.storage.workflow_instances.insert(
-                end_wflow
-            ))
-            asyncio.ensure_future(self.storage.task_instances.insert_many(
-                end_tasks
+            asyncio.ensure_future(self.storage.insert_instance(
+                sanitize_workflow_exec(wflow.report())
             ))
             del self.running_workflows[exec_id]
             memwrite = False

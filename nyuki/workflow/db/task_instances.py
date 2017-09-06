@@ -36,7 +36,7 @@ class TaskInstancesCollection:
         asyncio.ensure_future(self.index())
 
     async def index(self):
-        await self._instances.create_index('id')
+        await self._instances.create_index('id', unique=True)
         await self._instances.create_index('workflow_exec_id')
 
     async def get(self, wid, full=False):
@@ -54,27 +54,22 @@ class TaskInstancesCollection:
         """
         Return one task instance.
         """
+        filters = {'_id': 0, 'workflow_exec_id': 0}
         if full is False:
-            filters = {'_id': 0, 'inputs': 0, 'outputs': 0}
-        else:
-            filters = {'_id': 0}
+            filters.update({'inputs': 0, 'outputs': 0})
         return await self._instances.find_one({'id': tid}, filters)
 
     async def get_data(self, tid):
         """
         Return the data (inputs/outputs) of one executed task.
         """
-        task = await self._instances.find_one(
+        return await self._instances.find_one(
             {'id': tid},
             {'_id': 0, 'inputs': 1, 'outputs': 1},
         )
-        return {
-            'inputs': task['inputs'],
-            'outputs': task['outputs'],
-        } if task else None
 
     async def insert_many(self, tasks):
         """
-        Insert a finished workflow task.
+        Insert all the tasks of a finished workflow.
         """
         await self._instances.insert_many(tasks)

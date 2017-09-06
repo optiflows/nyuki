@@ -53,12 +53,11 @@ class WorkflowInstancesCollection:
         """
         Return the instance with `exec_id` from workflow history.
         """
-        workflow = await self._instances.find_one(
-            {'id': exec_id}, {'_id': 0}
-        )
-        if workflow:
-            workflow['template']['tasks'] = await self._storage.task_instances.get(exec_id, full)
-        return workflow
+        fields = {'_id': 0}
+        if full is False:
+            fields['template.graph'] = 0
+
+        return await self._instances.find_one({'id': exec_id}, fields)
 
     async def get(self, root=False, full=False, offset=None, limit=None,
                   since=None, state=None, search=None, order=None):
@@ -66,6 +65,7 @@ class WorkflowInstancesCollection:
         Return all instances from history from `since` with state `state`.
         """
         query = {}
+        fields = {'_id': 0}
         # Prepare query
         if isinstance(since, datetime):
             query['start'] = {'$gte': since}
@@ -76,7 +76,10 @@ class WorkflowInstancesCollection:
         if search:
             query['template.title'] = {'$regex': '.*{}.*'.format(search)}
 
-        fields = {'_id': 0}
+        if full is False:
+            # If not a 'full' request, hide the graph as well.
+            fields['template.graph'] = 0
+
         cursor = self._instances.find(query, fields)
         # Count total results regardless of limit/offset
         count = await cursor.count()
@@ -95,22 +98,10 @@ class WorkflowInstancesCollection:
             cursor.limit(limit)
 
         # Execute query
-        workflows = await cursor.to_list(None)
-        if full is True:
-            for workflow in workflows:
-                workflow['template']['tasks'] = await self._storage.task_instances.get(
-                    workflow['id'], True
-                )
-        return count, workflows
+        return count, await cursor.to_list(None)
 
     async def insert(self, workflow):
         """
         Insert a finished workflow report into the workflow history.
         """
-        try:
-            await self._instances.insert(workflow)
-        except DuplicateKeyError:
-            # If it's a duplicate, we don't want to lose it
-            workflow['duplicate'] = workflow['id']
-            workflow['id'] = str(uuid4())
-            await self._instances.insert(workflow)
+        await self._instances.insert_one(workflow)
