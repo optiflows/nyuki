@@ -26,7 +26,7 @@ class Ordering(Enum):
         return [key for key in cls.__members__.keys()]
 
 
-class WorkflowInstanceCollection:
+class WorkflowInstancesCollection:
 
     REQUESTER_REGEX = re.compile(r'^nyuki://.*')
 

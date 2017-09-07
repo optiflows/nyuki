@@ -8,7 +8,7 @@ log = logging.getLogger(__name__)
 WS_FILTERS = ('quorum', 'status', 'twilio_error', 'timeout', 'diff')
 
 
-class TaskInstanceCollection:
+class TaskInstancesCollection:
 
     TASK_HISTORY_FILTERS = {
         '_id': 0,

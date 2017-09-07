@@ -7,7 +7,7 @@ from pymongo import DESCENDING
 log = logging.getLogger(__name__)
 
 
-class WorkflowTemplateCollection:
+class WorkflowTemplatesCollection:
 
     """
     Holds all the templates created for tukio, with their versions.
@@ -17,14 +17,13 @@ class WorkflowTemplateCollection:
 
     {
         "id": <uuid4>,
-        "policy": <str><,
+        "policy": <str>,
         "topics": [<str>],
         "graph": {},
         "title": <str>,
         "tags": [<str>],
         "version": <int>,
-        "draft": <null | false | true>,
-        "scheme": <int>
+        "draft": <null | false | true>
     }
     """
 

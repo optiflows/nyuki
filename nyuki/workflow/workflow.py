@@ -153,7 +153,7 @@ class WorkflowNyuki(Nyuki):
         'properties': {
             'mongo': {
                 'type': 'object',
-                'required': ['host'],
+                'required': ['host', 'database'],
                 'properties': {
                     'host': {'type': 'string', 'minLength': 1},
                     'database': {'type': 'string', 'minLength': 1}

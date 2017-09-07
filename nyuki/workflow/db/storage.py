@@ -1,15 +1,13 @@
-import sys
-import asyncio
 import logging
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from .triggers import TriggerCollection
 from .data_processing import DataProcessingCollection
 from .metadata import MetadataCollection
-from .workflow_templates import WorkflowTemplateCollection
-from .task_templates import TaskTemplateCollection
-from .workflow_instances import WorkflowInstanceCollection
-from .task_instances import TaskInstanceCollection
+from .workflow_templates import WorkflowTemplatesCollection
+from .task_templates import TaskTemplatesCollection
+from .workflow_instances import WorkflowInstancesCollection
+from .task_instances import TaskInstancesCollection
 
 
 log = logging.getLogger(__name__)
@@ -17,14 +15,13 @@ log = logging.getLogger(__name__)
 
 class MongoStorage:
 
-    DEFAULT_DATABASE = 'workflow'
-
     def __init__(self):
         self.client = None
         self.db = None
 
         # Collections
-        self.templates = None
+        self.workflow_templates = None
+        self.task_templates = None
         self.regexes = None
         self.lookups = None
         self.triggers = None
@@ -32,19 +29,18 @@ class MongoStorage:
         self.workflow_instances = None
         self.task_instances = None
 
-    def configure(self, host, database=None, **kwargs):
+    def configure(self, host, database, **kwargs):
         log.info("Setting up workflow mongo storage with host '%s'", host)
         self.client = AsyncIOMotorClient(host, **kwargs)
-        db_name = database or self.DEFAULT_DATABASE
-        self.db = self.client[db_name]
-        log.info("Workflow database: '%s'", db_name)
+        self.db = self.client[database]
+        log.info("Workflow database: '%s'", database)
 
         # Collections
-        self.workflow_templates = WorkflowTemplateCollection(self)
-        self.task_templates = TaskTemplateCollection(self)
+        self.workflow_templates = WorkflowTemplatesCollection(self)
+        self.task_templates = TaskTemplatesCollection(self)
         self.regexes = DataProcessingCollection(self, 'regexes')
         self.lookups = DataProcessingCollection(self, 'lookups')
         self.triggers = TriggerCollection(self)
         self.metadata = MetadataCollection(self)
-        self.workflow_instances = WorkflowInstanceCollection(self)
-        self.task_instances = TaskInstanceCollection(self)
+        self.workflow_instances = WorkflowInstancesCollection(self)
+        self.task_instances = TaskInstancesCollection(self)

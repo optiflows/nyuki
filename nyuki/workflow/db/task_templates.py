@@ -7,7 +7,7 @@ from pymongo.errors import DuplicateKeyError
 log = logging.getLogger(__name__)
 
 
-class TaskTemplateCollection:
+class TaskTemplatesCollection:
 
     """
     {
@@ -16,7 +16,6 @@ class TaskTemplateCollection:
         "config": {},
         "topics": [<str>],
         "title": <str>,
-        "scheme": 0,
         "workflow_template": {
             "id": <uuid4>,
             "version": <int>
