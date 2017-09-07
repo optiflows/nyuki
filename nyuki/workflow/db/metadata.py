@@ -1,5 +1,8 @@
 import asyncio
 import logging
+from uuid import uuid4
+
+from pymongo import ReturnDocument
 
 
 log = logging.getLogger(__name__)
@@ -7,52 +10,55 @@ log = logging.getLogger(__name__)
 
 class MetadataCollection:
 
-    def __init__(self, storage):
-        self._metadata = storage.db['workflow_metadata']
+    """
+    {
+        "workflow_template_id": <uuid4>,
+        "title": <str>,
+        "tags": [<str>]
+    }
+    """
+
+    def __init__(self, db):
+        self._metadata = db['workflow_metadata']
         asyncio.ensure_future(self.index())
 
     async def index(self):
-        await self._metadata.create_index('id', unique=True)
-
-    async def get(self, tids=None):
-        """
-        Return metadata for all or part of the templates.
-        """
-        if isinstance(tids, list):
-            query = {'id': {'$in': tids}}
-        else:
-            query = None
-
-        cursor = self._metadata.find(query, {'_id': 0})
-        return await cursor.to_list(None)
+        await self._metadata.create_index('workflow_template_id', unique=True)
 
     async def get_one(self, tid):
         """
         Return metadata for one template.
         """
-        return await self._metadata.find_one({'id': tid}, {'_id': 0})
+        return await self._metadata.find_one(
+            {'workflow_template_id': tid},
+            {'_id': 0, 'workflow_template_id': 0},
+        )
 
     async def insert(self, metadata):
         """
         Insert new metadata for a template.
         """
-        query = {'id': metadata['id']}
-
-        metadata = {
-            'id': metadata['id'],
-            'title': metadata.get('title', ''),
-            'tags': metadata.get('tags', [])
-        }
-
-        await self._metadata.replace_one(query, metadata, upsert=True)
-        log.info(
-            'Inserted metadata for template %s (%s)',
-            metadata['id'][:8], metadata['title'],
-        )
+        await self._metadata.insert_one(metadata)
+        del metadata['_id']
         return metadata
+
+    async def update(self, tid, metadata):
+        """
+        Update and return the updated metadata.
+        """
+        return await self._metadata.find_one_and_update(
+            {'workflow_template_id': tid},
+            {'$set': {
+                key: value
+                for key, value in metadata.items()
+                if value is not None
+            }},
+            projection={'_id': 0},
+            return_document=ReturnDocument.AFTER,
+        )
 
     async def delete(self, tid):
         """
         Delete metadata for one template.
         """
-        await self._metadata.delete_one({'id': tid})
+        await self._metadata.delete_one({'workflow_template_id': tid})

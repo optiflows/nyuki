@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from pymongo import ASCENDING, DESCENDING
-from pymongo.errors import DuplicateKeyError
 
 
 log = logging.getLogger(__name__)
@@ -23,8 +22,8 @@ class TaskTemplatesCollection:
     }
     """
 
-    def __init__(self, storage):
-        self._templates = storage.db['task_templates']
+    def __init__(self, db):
+        self._templates = db['task_templates']
         asyncio.ensure_future(self.index())
 
     async def index(self):
@@ -42,7 +41,7 @@ class TaskTemplatesCollection:
         cursor = self._templates.find(
             {
                 'workflow_template.id': workflow_id,
-                'workflow_template.version': version
+                'workflow_template.version': version,
             },
             {
                 '_id': 0,
@@ -51,16 +50,33 @@ class TaskTemplatesCollection:
         )
         return await cursor.to_list(None)
 
-    async def insert(self, task):
+    async def insert_many(self, tasks, template):
         """
-        Insert a whole task depending on its id/version.
+        Update multiple tasks at once, remove the now unused tasks.
         """
-        query = {
-            'id': task['id'],
-            'workflow_template.id': task['workflow_template']['id'],
-            'workflow_template.version': task['workflow_template']['version'],
-        }
-        await self._templates.replace_one(query, task, upsert=True)
+        # Delete all tasks that are not in the list (draft mode).
+        await self._templates.delete_many({
+            'id': {'$nin': [task['id'] for task in tasks]},
+            'workflow_template.id': template['id'],
+            'workflow_template.version': template['version'],
+        })
 
-    async def delete(self, tid):
-        await self._templates.delete_many({'id': tid})
+        # Re-update all the tasks.
+        bulk = self._templates.initialize_unordered_bulk_op()
+        for task in tasks:
+            task['workflow_template'] = {
+                'id': template['id'],
+                'version': template['version'],
+            }
+            bulk.find({
+                'id': task['id'],
+                'workflow_template.id': template['id'],
+                'workflow_template.version': template['version'],
+            }).upsert().replace_one(task)
+        await bulk.execute()
+
+    async def delete_many(self, tid):
+        """
+        Delete all tasks of one template.
+        """
+        await self._templates.delete_many({'workflow_template.id': tid})

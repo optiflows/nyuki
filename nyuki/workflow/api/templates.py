@@ -5,6 +5,7 @@ from tukio.workflow import TemplateGraphError, WorkflowTemplate
 
 from nyuki.api import Response, resource
 from nyuki.workflow.validation import validate, TemplateError
+from nyuki.workflow.db.workflow_templates import TemplateState
 
 
 log = logging.getLogger(__name__)
@@ -26,35 +27,28 @@ class _TemplateResource:
     Share methods between templates resources
     """
 
-    async def update_draft(self, template, from_request):
+    async def update_draft(self, template, request):
         """
-        Helper to insert/update a draft
+        Helper to insert/update a draft.
         """
-        tmpl_dict = template.as_dict()
-
-        # Auto-increment version, draft only
-        last_version = await self.nyuki.storage.workflow_templates.get_last_version(
-            template.uid
-        )
-        tmpl_dict['version'] = last_version + 1
-        tmpl_dict['draft'] = True
+        template = {
+            **template.as_dict(),
+            'title': request['title'],
+            'tags': request.get('tags', []),
+        }
 
         # Store task extra info (ie. title)
-        rqst_tasks = from_request.get('tasks', [])
-        tmpl_tasks = tmpl_dict['tasks']
+        rqst_tasks = request.get('tasks', [])
+        tmpl_tasks = template['tasks']
         for src in rqst_tasks:
             match = list(filter(lambda t: t['id'] == src['id'], tmpl_tasks))
             if match:
                 match[0].update({'title': src.get('title')})
 
         try:
-            template = await self.nyuki.storage.workflow_templates.insert_draft(
-                tmpl_dict
-            )
+            return await self.nyuki.storage.update_draft(template)
         except DuplicateKeyError as exc:
             raise DuplicateKeyError('Template already exists for this version') from exc
-
-        return template
 
     def errors_from_validation(self, template):
         """
@@ -76,7 +70,7 @@ class ApiTemplates(_TemplateResource):
         Return available workflows' DAGs
         """
         try:
-            templates = await self.nyuki.storage.workflow_templates.get(
+            templates = await self.nyuki.storage.get_templates(
                 full=(request.GET.get('full') == '1'),
             )
         except AutoReconnect:
@@ -88,18 +82,13 @@ class ApiTemplates(_TemplateResource):
         Create a workflow DAG from JSON
         """
         request = await request.json()
-
         if 'id' in request:
-            try:
-                draft = await self.nyuki.storage.workflow_templates.get_one(
-                    request['id'], draft=True
-                )
-            except AutoReconnect:
-                return Response(status=503)
-            if draft:
-                return Response(status=409, body={
-                    'error': 'draft already exists'
-                })
+            del request['id']
+
+        if 'title' not in request:
+            return Response(status=400, body={
+                'error': "workflow 'title' is mandatory"
+            })
 
         if self.nyuki.DEFAULT_POLICY is not None and 'policy' not in request:
             request['policy'] = self.nyuki.DEFAULT_POLICY
@@ -112,36 +101,14 @@ class ApiTemplates(_TemplateResource):
             })
 
         try:
-            metadata = await self.nyuki.storage.metadata.get_one(template.uid)
-        except AutoReconnect:
-            return Response(status=503)
-
-        if not metadata:
-            if 'title' not in request:
-                return Response(status=400, body={
-                    'error': "workflow 'title' key is mandatory"
-                })
-
-            metadata = {
-                'id': template.uid,
-                'title': request['title'],
-                'tags': request.get('tags', [])
-            }
-
-            await self.nyuki.storage.metadata.insert(metadata)
-
-        try:
             tmpl_dict = await self.update_draft(template, request)
         except DuplicateKeyError as exc:
             return Response(status=409, body={
                 'error': exc
             })
 
-        return Response({
-            **tmpl_dict,
-            **metadata,
-            'errors': self.errors_from_validation(template)
-        })
+        tmpl_dict['errors'] = self.errors_from_validation(template)
+        return Response(tmpl_dict)
 
 
 @resource('/workflow/templates/{tid}', versions=['v1'])
@@ -152,34 +119,29 @@ class ApiTemplate(_TemplateResource):
         Return the latest version of the template
         """
         try:
-            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid)
+            tmpl = await self.nyuki.storage.get_template(tid)
         except AutoReconnect:
             return Response(status=503)
-
         if not tmpl:
-            # Check if a draft is available
-            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid, draft=True)
-            if not tmpl:
-                return Response(status=404)
-
+            return Response(status=404)
         return Response(tmpl)
 
     async def put(self, request, tid):
         """
-        Create a new draft for this template id
+        Create a new draft for this template id.
         """
         try:
-            draft = await self.nyuki.storage.workflow_templates.get_one(tid, draft=True)
+            tmpl = await self.nyuki.storage.get_template(tid)
         except AutoReconnect:
             return Response(status=503)
+        if not tmpl:
+            return Response(status=404)
+
+        draft = await self.nyuki.storage.get_template(tid, draft=True)
         if draft:
             return Response(status=409, body={
                 'error': 'This draft already exists'
             })
-
-        tmpl = await self.nyuki.storage.workflow_templates.get_one(tid, draft=False)
-        if not tmpl:
-            return Response(status=404)
 
         request = await request.json()
 
@@ -198,20 +160,15 @@ class ApiTemplate(_TemplateResource):
                 'error': exc
             })
 
-        metadata = await self.nyuki.storage.metadata.get_one(template.uid)
-
-        return Response({
-            **tmpl_dict,
-            **metadata,
-            'errors': self.errors_from_validation(template)
-        })
+        tmpl_dict['errors'] = self.errors_from_validation(template)
+        return Response(tmpl_dict)
 
     async def patch(self, request, tid):
         """
         Modify the template's metadata
         """
         try:
-            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid)
+            tmpl = await self.nyuki.storage.get_template(tid)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
@@ -220,9 +177,9 @@ class ApiTemplate(_TemplateResource):
         request = await request.json()
 
         # Add ID, request dict cleaned in storage
-        metadata = await self.nyuki.storage.metadata.insert({
-            **request,
-            'id': tid,
+        metadata = await self.nyuki.storage.update_metadata(tid, {
+            'title': request.get('title'),
+            'tags': request.get('tags', []),
         })
 
         return Response(metadata)
@@ -232,15 +189,13 @@ class ApiTemplate(_TemplateResource):
         Delete the template
         """
         try:
-            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid)
+            tmpl = await self.nyuki.storage.get_template(tid)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
             return Response(status=404)
 
-        await self.nyuki.storage.workflow_templates.delete(tid)
-        await self.nyuki.storage.triggers.delete(tid)
-
+        await self.nyuki.storage.delete_template(tid)
         return Response(tmpl)
 
 
@@ -260,20 +215,6 @@ class ApiTemplateVersion(_TemplateResource):
 
         return Response(tmpl)
 
-    async def delete(self, request, tid, version):
-        """
-        Delete a template with given version
-        """
-        try:
-            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid)
-        except AutoReconnect:
-            return Response(status=503)
-        if not tmpl:
-            return Response(status=404)
-
-        await self.nyuki.storage.workflow_templates.delete(tid, version)
-        return Response(tmpl)
-
 
 @resource('/workflow/templates/{tid}/draft', versions=['v1'])
 class ApiTemplateDraft(_TemplateResource):
@@ -283,7 +224,7 @@ class ApiTemplateDraft(_TemplateResource):
         Return the template's draft, if any
         """
         try:
-            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid, draft=True)
+            tmpl = await self.nyuki.storage.get_template(tid, draft=True)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
@@ -296,17 +237,15 @@ class ApiTemplateDraft(_TemplateResource):
         Publish a draft into production
         """
         try:
-            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid, draft=True)
+            tmpl_dict = await self.nyuki.storage.get_template(tid, draft=True)
         except AutoReconnect:
             return Response(status=503)
-        if not tmpl:
+        if not tmpl_dict:
             return Response(status=404)
-
-        tmpl['draft'] = False
 
         try:
             # Set template ID from url
-            template = WorkflowTemplate.from_dict(tmpl)
+            template = WorkflowTemplate.from_dict(tmpl_dict)
         except TemplateGraphError as exc:
             return Response(status=400, body={
                 'error': str(exc)
@@ -314,18 +253,19 @@ class ApiTemplateDraft(_TemplateResource):
 
         errors = self.errors_from_validation(template)
         if errors is not None:
-            return Response(status=400, body=errors)
+            return Response(errors, status=400)
 
         # Update draft into a new template
-        await self.nyuki.storage.workflow_templates.publish_draft(tid)
-        return Response(tmpl)
+        await self.nyuki.storage.publish_draft(tid)
+        tmpl_dict['state'] = TemplateState.ACTIVE.value
+        return Response(tmpl_dict)
 
     async def patch(self, request, tid):
         """
         Modify the template's draft
         """
         try:
-            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid, draft=True)
+            tmpl = await self.nyuki.storage.get_template(tid, draft=True)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
@@ -348,24 +288,19 @@ class ApiTemplateDraft(_TemplateResource):
                 'error': str(exc)
             })
 
-        metadata = await self.nyuki.storage.metadata.get_one(template.uid)
-
-        return Response({
-            **tmpl_dict,
-            **metadata,
-            'errors': self.errors_from_validation(template)
-        })
+        tmpl_dict['errors'] = self.errors_from_validation(template)
+        return Response(tmpl_dict)
 
     async def delete(self, request, tid):
         """
         Delete the template's draft
         """
         try:
-            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid, draft=True)
+            tmpl = await self.nyuki.storage.get_template(tid, draft=True)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:
             return Response(status=404)
 
-        await self.nyuki.storage.workflow_templates.delete(tid, draft=True)
+        await self.nyuki.storage.delete_template(tid, draft=True)
         return Response(tmpl)

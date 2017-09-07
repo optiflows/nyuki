@@ -1,10 +1,26 @@
 import asyncio
 import logging
+from enum import Enum
 from copy import deepcopy
 from pymongo import DESCENDING
 
 
 log = logging.getLogger(__name__)
+
+
+class TemplateState(Enum):
+
+    DRAFT = 'draft'
+    ACTIVE = 'active'
+    ARCHIVED = 'archived'
+
+    @classmethod
+    def active_states(cls):
+        return [cls.DRAFT.value, cls.ACTIVE.value]
+
+    @classmethod
+    def draft_state(cls, draft):
+        return cls.DRAFT.value if draft is True else cls.ACTIVE.value
 
 
 class WorkflowTemplatesCollection:
@@ -20,16 +36,13 @@ class WorkflowTemplatesCollection:
         "policy": <str>,
         "topics": [<str>],
         "graph": {},
-        "title": <str>,
-        "tags": [<str>],
         "version": <int>,
-        "draft": <null | false | true>
+        "state": <draft | active | archived>
     }
     """
 
-    def __init__(self, storage):
-        self._storage = storage
-        self._templates = storage.db['workflow_templates']
+    def __init__(self, db):
+        self._templates = db['workflow_templates']
         asyncio.ensure_future(self.index())
 
     async def index(self):
@@ -39,58 +52,40 @@ class WorkflowTemplatesCollection:
             unique=True
         )
         await self._templates.create_index(
-            [('id', DESCENDING), ('draft', DESCENDING)]
+            [('id', DESCENDING), ('state', DESCENDING)]
         )
 
-    async def get(self, full=False, with_metadata=True):
+    async def get(self, full=False):
         """
-        Return all latest and draft templates
+        Return all active and draft templates
         Used at nyuki's startup and GET /v1/templates
         """
         filters = {'_id': 0}
-        # '/v1/workflow/templates' does not requires all the informations
         if full is False:
-            filters.update({'id': 1, 'draft': 1, 'version': 1, 'topics': 1})
+            filters.update({'id': 1, 'state': 1, 'version': 1, 'topics': 1})
 
-        # Retrieve only the published and the drafts
+        # Retrieve only the actives and the drafts
         cursor = self._templates.find(
-            {'draft': {'$in': [True, False]}},
+            {'state': {'$in': TemplateState.active_states()}},
             filters,
         )
-        templates = await cursor.to_list(None)
+        return await cursor.to_list(None)
 
-        # Collect metadata
-        if with_metadata and templates:
-            metadatas = await self._storage.metadata.get([tmpl['id'] for tmpl in templates])
-            metadatas = {meta['id']: meta for meta in metadatas}
-            for template in templates:
-                template.update(metadatas[template['id']])
-
-        return templates
-
-    async def get_one(self, tid, version=None, draft=False, with_metadata=True):
+    async def get_one(self, tid, version=None, draft=False):
         """
         Return a template's configuration and versions
         """
         if version is not None:
+            # We ask for a specific version, regardless of its state.
             query = {'id': tid, 'version': int(version)}
         else:
-            query = {'id': tid, 'draft': draft}
+            # Else, we ask for either the active version or the draft.
+            query = {
+                'id': tid,
+                'state': TemplateState.draft_state(draft),
+            }
 
-        template = await self._templates.find_one(query, {'_id': 0})
-
-        # Collect metadata
-        if with_metadata and template:
-            metadata = await self._storage.metadata.get_one(tid)
-            if metadata:
-                template.update(metadata)
-
-        if template:
-            template['tasks'] = await self._storage.task_templates.get(
-                template['id'], template['version']
-            )
-
-        return template
+        return await self._templates.find_one(query, {'_id': 0})
 
     async def get_for_topic(self, topic):
         """
@@ -99,78 +94,58 @@ class WorkflowTemplatesCollection:
         """
         query = {
             '$or': [
-                {'topics': topic, 'draft': False},
-                {'topics': None, 'draft': False},
+                {'topics': topic, 'state': TemplateState.ACTIVE.value},
+                {'topics': None, 'state': TemplateState.ACTIVE.value},
             ]
         }
         cursor = self._templates.find(query, {'_id': 0})
-        templates = await cursor.to_list(None)
-
-        for template in templates:
-            template['tasks'] = await self._storage.task_templates.get(
-                template['id'], template['version']
-            )
-
-        return templates
+        return await cursor.to_list(None)
 
     async def get_last_version(self, tid):
         """
         Return the highest version of a template
         """
-        query = {'id': tid, 'draft': False}
-        template = await self._templates.find_one(query)
+        query = {'id': tid, 'state': TemplateState.ACTIVE.value}
+        template = await self._templates.find_one(query, {'version': 1})
         return template['version'] if template else 0
 
     async def insert_draft(self, template):
         """
-        Check and insert draft, updatable
+        Insert or replace a template document.
+        This is used to update a draft.
         """
         query = {
             'id': template['id'],
-            'draft': True
+            'state': TemplateState.DRAFT.value,
         }
+        await self._templates.replace_one(query, template, upsert=True)
 
-        # Insert tasks
-        to_insert = deepcopy(template)
-        for task in to_insert['tasks']:
-            task['workflow_template'] = {
-                'id': template['id'],
-                'version': template['version'],
-            }
-            await self._storage.task_templates.insert(task)
-        del to_insert['tasks']
-
-        log.info('Update draft for query: %s', query)
-        await self._templates.replace_one(query, to_insert, upsert=True)
-        return template
-
-    async def publish_draft(self, tid):
+    async def publish(self, tid):
         """
-        Set the last published template (draft: False) to None
-        Set the draft template (draft: True) to False
+        Set the last published template to 'archived'.
+        Set the draft of this template to 'active'.
         """
         await self._templates.update_one(
-            {'id': tid, 'draft': False},
-            {'$set': {'draft': None}},
+            {'id': tid, 'state': TemplateState.ACTIVE.value},
+            {'$set': {'state': TemplateState.ARCHIVED.value}},
         )
         await self._templates.update_one(
-            {'id': tid, 'draft': True},
-            {'$set': {'draft': False}},
+            {'id': tid, 'state': TemplateState.DRAFT.value},
+            {'$set': {'state': TemplateState.ACTIVE.value}},
         )
 
-    async def delete(self, tid, version=None, draft=None):
+    async def delete(self, tid, draft=False):
         """
-        Delete a template from its id with all its versions
+        Delete a template with all its versions.
+        Delete only the draft if specified.
         """
-        query = {'id': tid}
-        if version:
-            query['version'] = version
-        if draft is not None:
-            query['draft'] = draft
+        if draft is False:
+            # Delete all template versions.
+            await self._templates.delete_many({'id': tid})
+            return
 
-        log.info("Removing template(s) with query: %s", query)
-
-        await self._templates.delete_many(query)
-        left = await self._templates.find({'id': tid}).count()
-        if not left:
-            await self._storage.metadata.delete(tid)
+        # Delete only the draft.
+        await self._templates.delete_one({
+            'id': tid,
+            'state': TemplateState.DRAFT.value,
+        })

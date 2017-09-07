@@ -7,8 +7,8 @@ log = logging.getLogger(__name__)
 
 class TriggerCollection:
 
-    def __init__(self, storage):
-        self._triggers = storage.db['triggers']
+    def __init__(self, db):
+        self._triggers = db['triggers']
         asyncio.ensure_future(self.index())
 
     async def index(self):
@@ -35,9 +35,8 @@ class TriggerCollection:
         await self._triggers.replace_one({'tid': tid}, data, upsert=True)
         return data
 
-    async def delete(self, template_id=None):
+    async def delete(self, tid):
         """
         Delete a trigger form
         """
-        query = {'tid': template_id} if template_id is not None else None
-        await self._triggers.delete_one(query)
+        await self._triggers.delete_one({'tid': tid})
