@@ -207,7 +207,7 @@ class ApiTemplateVersion(_TemplateResource):
         Return the template's given version
         """
         try:
-            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid, version=version)
+            tmpl = await self.nyuki.storage.get_template(tid, version=version)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:

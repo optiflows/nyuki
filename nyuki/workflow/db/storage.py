@@ -108,7 +108,8 @@ class MongoStorage:
 
     async def get_templates(self, template_id=None, full=False):
         """
-        Return all active/draft templates, limited version by default.
+        Return all active/draft templates
+        Limited to a small set of fields if 'full' is False.
         TODO: Pagination.
         """
         templates = await self._workflow_templates.get(template_id, full)
@@ -121,27 +122,14 @@ class MongoStorage:
                 )
         return templates
 
-    async def get_template(self, tid, draft=False):
+    async def get_template(self, tid, draft=False, version=None):
         """
         Return the active template.
         """
-        template = await self._workflow_templates.get_one(tid, draft=draft)
-        if not template:
-            return
-
-        metadata = await self._metadata.get_one(tid)
-        template.update(metadata)
-        template['tasks'] = await self._task_templates.get(
-            template['id'], template['version']
-        )
-        return template
-
-    async def get_template_version(self, tid, version):
-        """
-        Return a specific version of a template.
-        """
         template = await self._workflow_templates.get_one(
-            tid, version=int(version)
+            tid,
+            draft=draft,
+            version=int(version) if version else None,
         )
         if not template:
             return
