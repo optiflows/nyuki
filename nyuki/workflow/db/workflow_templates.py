@@ -55,20 +55,20 @@ class WorkflowTemplatesCollection:
             [('id', DESCENDING), ('state', DESCENDING)]
         )
 
-    async def get(self, full=False):
+    async def get(self, template_id=None, full=False):
         """
         Return all active and draft templates
         Used at nyuki's startup and GET /v1/templates
         """
+        query = {'state': {'$in': TemplateState.active_states()}}
+        if template_id is not None:
+            query['id'] = template_id
         filters = {'_id': 0}
         if full is False:
             filters.update({'id': 1, 'state': 1, 'version': 1, 'topics': 1})
 
         # Retrieve only the actives and the drafts
-        cursor = self._templates.find(
-            {'state': {'$in': TemplateState.active_states()}},
-            filters,
-        )
+        cursor = self._templates.find(query, filters)
         return await cursor.to_list(None)
 
     async def get_one(self, tid, version=None, draft=False):

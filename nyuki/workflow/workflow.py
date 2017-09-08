@@ -353,12 +353,9 @@ class WorkflowNyuki(Nyuki):
         # (this does may more requests than it should)
         wf_templates = await self.engine.selector.select(efrom)
         for wftmpl in wf_templates:
-            template = await self.storage.workflow_templates.get_one(
-                wftmpl.uid,
-                draft=False,
-                with_metadata=True
+            templates[wftmpl.uid] = await self.storage.get_template(
+                wftmpl.uid, draft=False
             )
-            templates[wftmpl.uid] = template
         # Trigger workflows
         instances = await self.engine.data_received(data, efrom)
         for instance in instances:

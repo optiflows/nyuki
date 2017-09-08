@@ -106,12 +106,12 @@ class MongoStorage:
             )
         return templates
 
-    async def get_templates(self, full=False):
+    async def get_templates(self, template_id=None, full=False):
         """
         Return all active/draft templates, limited version by default.
         TODO: Pagination.
         """
-        templates = await self._workflow_templates.get(full)
+        templates = await self._workflow_templates.get(template_id, full)
         for template in templates:
             metadata = await self._metadata.get_one(template['id'])
             template.update(metadata)

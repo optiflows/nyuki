@@ -119,7 +119,7 @@ class ApiTemplate(_TemplateResource):
         Return the latest version of the template
         """
         try:
-            tmpl = await self.nyuki.storage.get_template(tid)
+            tmpl = await self.nyuki.storage.get_templates(tid, full=True)
         except AutoReconnect:
             return Response(status=503)
         if not tmpl:

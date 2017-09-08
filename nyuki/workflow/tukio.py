@@ -8,13 +8,13 @@ class WorkflowSelector:
         self.storage = storage
 
     async def get(self, tmpl_id):
-        template = await self.storage.workflow_templates.get_one(
+        template = await self.storage.get_template(
             tmpl_id, draft=False
         )
         return WorkflowTemplate.from_dict(template)
 
     async def select(self, topic):
-        templates = await self.storage.workflow_templates.get_for_topic(topic)
+        templates = await self.storage.get_for_topic(topic)
         return [
             WorkflowTemplate.from_dict(template)
             for template in templates
