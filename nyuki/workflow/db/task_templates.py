@@ -62,8 +62,10 @@ class TaskTemplatesCollection:
         })
 
         # Re-update all the tasks.
+        must_execute = False
         bulk = self._templates.initialize_unordered_bulk_op()
         for task in tasks:
+            must_execute = True
             task['workflow_template'] = {
                 'id': template['id'],
                 'version': template['version'],
@@ -73,7 +75,9 @@ class TaskTemplatesCollection:
                 'workflow_template.id': template['id'],
                 'workflow_template.version': template['version'],
             }).upsert().replace_one(task)
-        await bulk.execute()
+
+        if must_execute is True:
+            await bulk.execute()
 
     async def delete_many(self, tid):
         """
