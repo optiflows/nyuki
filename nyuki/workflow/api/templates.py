@@ -27,7 +27,7 @@ class _TemplateResource:
     Share methods between templates resources
     """
 
-    async def update_draft(self, template, request):
+    async def upsert_draft(self, template, request):
         """
         Helper to insert/update a draft.
         """
@@ -46,7 +46,7 @@ class _TemplateResource:
                 match[0].update({'title': src.get('title')})
 
         try:
-            return await self.nyuki.storage.update_draft(template)
+            return await self.nyuki.storage.upsert_draft(template)
         except DuplicateKeyError as exc:
             raise DuplicateKeyError('Template already exists for this version') from exc
 
@@ -101,7 +101,7 @@ class ApiTemplates(_TemplateResource):
             })
 
         try:
-            tmpl_dict = await self.update_draft(template, request)
+            tmpl_dict = await self.upsert_draft(template, request)
         except DuplicateKeyError as exc:
             return Response(status=409, body={
                 'error': exc
@@ -154,7 +154,7 @@ class ApiTemplate(_TemplateResource):
             })
 
         try:
-            tmpl_dict = await self.update_draft(template, request)
+            tmpl_dict = await self.upsert_draft(template, request)
         except DuplicateKeyError as exc:
             return Response(status=409, body={
                 'error': exc
@@ -282,7 +282,7 @@ class ApiTemplateDraft(_TemplateResource):
             })
 
         try:
-            tmpl_dict = await self.update_draft(template, request)
+            tmpl_dict = await self.upsert_draft(template, request)
         except DuplicateKeyError as exc:
             return Response(status=409, body={
                 'error': str(exc)

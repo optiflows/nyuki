@@ -24,10 +24,10 @@ class MongoStorage:
         # Collections
         self._workflow_templates = None
         self._task_templates = None
+        self._metadata = None
+        self._triggers = None
         self._regexes = None
         self._lookups = None
-        self._triggers = None
-        self._metadata = None
         self._workflow_instances = None
         self._task_instances = None
 
@@ -42,10 +42,10 @@ class MongoStorage:
         self._task_templates = TaskTemplatesCollection(self._db)
         self._metadata = MetadataCollection(self._db)
         self._triggers = TriggerCollection(self._db)
-        # self._regexes = DataProcessingCollection(self._db, 'regexes')
-        # self._lookups = DataProcessingCollection(self._db, 'lookups')
-        # self._workflow_instances = WorkflowInstancesCollection(self._db)
-        # self._task_instances = TaskInstancesCollection(self._db)
+        self._regexes = DataProcessingCollection(self._db, 'regexes')
+        self._lookups = DataProcessingCollection(self._db, 'lookups')
+        self._workflow_instances = WorkflowInstancesCollection(self._db)
+        self._task_instances = TaskInstancesCollection(self._db)
 
     async def update_metadata(self, tid, metadata):
         """
@@ -53,7 +53,7 @@ class MongoStorage:
         """
         return await self._metadata.update(tid, metadata)
 
-    async def update_draft(self, template):
+    async def upsert_draft(self, template):
         """
         Update a template's draft and all its associated tasks.
         """
@@ -86,7 +86,7 @@ class MongoStorage:
         """
         Publish a draft into an 'active' state, and archive the old active.
         """
-        await self._workflow_templates.publish(template_id)
+        await self._workflow_templates.publish_draft(template_id)
         log.info('Draft for template %s published', template_id[:8])
 
     async def get_for_topic(self, topic):

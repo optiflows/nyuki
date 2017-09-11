@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from enum import Enum
-from copy import deepcopy
 from pymongo import DESCENDING
 
 
@@ -120,7 +119,7 @@ class WorkflowTemplatesCollection:
         }
         await self._templates.replace_one(query, template, upsert=True)
 
-    async def publish(self, tid):
+    async def publish_draft(self, tid):
         """
         Set the last published template to 'archived'.
         Set the draft of this template to 'active'.
