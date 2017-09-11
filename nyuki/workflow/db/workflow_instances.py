@@ -2,11 +2,9 @@ import re
 import asyncio
 import logging
 from enum import Enum
-from uuid import uuid4
 from datetime import datetime, timezone
 from bson.codec_options import CodecOptions
 from pymongo import DESCENDING, ASCENDING
-from pymongo.errors import DuplicateKeyError
 
 
 log = logging.getLogger(__name__)

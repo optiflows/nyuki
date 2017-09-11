@@ -186,17 +186,19 @@ class ApiTemplate(_TemplateResource):
 
     async def delete(self, request, tid):
         """
-        Delete the template
+        Delete the template and all its versions.
         """
         try:
-            tmpl = await self.nyuki.storage.get_template(tid)
+            templates = await self.nyuki.storage.get_templates(
+                template_id=tid, full=True
+            )
         except AutoReconnect:
             return Response(status=503)
-        if not tmpl:
+        if not templates:
             return Response(status=404)
 
         await self.nyuki.storage.delete_template(tid)
-        return Response(tmpl)
+        return Response(templates)
 
 
 @resource('/workflow/templates/{tid}/{version:\d+}', versions=['v1'])

@@ -273,14 +273,14 @@ class WorkflowNyuki(Nyuki):
         Send all worklfow updates to the clients.
         """
         source = event.source.as_dict()
-        exec_id = source['workflow_exec_id']
+        instance_id = source['workflow_exec_id']
         try:
-            wflow = self.running_workflows[exec_id]
+            wflow = self.running_workflows[instance_id]
         except KeyError:
             log.debug('Outdated event to report: %s', event)
             return
 
-        topic = 'workflow/exec/{}'.format(exec_id)
+        topic = 'workflow/exec/{}'.format(instance_id)
         payload = {
             'type': event.data['type'],
             'ts': utcnow(),
@@ -343,7 +343,7 @@ class WorkflowNyuki(Nyuki):
             asyncio.ensure_future(self.storage.insert_instance(
                 sanitize_workflow_exec(wflow.report())
             ))
-            del self.running_workflows[exec_id]
+            del self.running_workflows[instance_id]
             memwrite = False
 
         # Shared memory set/del
@@ -351,7 +351,7 @@ class WorkflowNyuki(Nyuki):
             if memwrite:
                 memjob = self.write_report(wflow.report())
             else:
-                memjob = self.clear_report(exec_id)
+                memjob = self.clear_report(instance_id)
             asyncio.ensure_future(memjob)
 
         asyncio.ensure_future(self.bus.publish(

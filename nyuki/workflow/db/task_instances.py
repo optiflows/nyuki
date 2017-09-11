@@ -37,7 +37,7 @@ class TaskInstancesCollection:
 
     async def index(self):
         await self._instances.create_index('id', unique=True)
-        await self._instances.create_index('workflow_exec_id')
+        await self._instances.create_index('workflow_instance_id')
 
     async def get(self, wid, full=False):
         """
@@ -46,15 +46,15 @@ class TaskInstancesCollection:
         if full is False:
             filters = self.TASK_HISTORY_FILTERS
         else:
-            filters = {'_id': 0, 'workflow_exec_id': 0}
-        cursor = self._instances.find({'workflow_exec_id': wid}, filters)
+            filters = {'_id': 0, 'workflow_instance_id': 0}
+        cursor = self._instances.find({'workflow_instance_id': wid}, filters)
         return await cursor.to_list(None)
 
     async def get_one(self, tid, full=False):
         """
         Return one task instance.
         """
-        filters = {'_id': 0, 'workflow_exec_id': 0}
+        filters = {'_id': 0, 'workflow_instance_id': 0}
         if full is False:
             filters.update({'inputs': 0, 'outputs': 0})
         return await self._instances.find_one({'id': tid}, filters)

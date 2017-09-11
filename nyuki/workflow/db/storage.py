@@ -160,12 +160,9 @@ class MongoStorage:
         Insert a static workflow instance and all its tasks.
         """
         task_instances = []
-        for task in instance['template']['tasks']:
-            task_instances.append({
-                **task,
-                'workflow_exec_id': instance['id'],
-            })
-        del instance['template']['tasks']
+        for task in instance['template'].pop('tasks'):
+            task['workflow_instance_id'] = instance['id']
+            task_instances.append(task)
         await self._task_instances.insert_many(task_instances)
         await self._workflow_instances.insert(instance)
 
