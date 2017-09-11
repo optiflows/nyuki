@@ -25,11 +25,11 @@ class MongoStorage:
         self._workflow_templates = None
         self._task_templates = None
         self._metadata = None
-        self._triggers = None
-        self._regexes = None
-        self._lookups = None
         self._workflow_instances = None
         self._task_instances = None
+        self.regexes = None
+        self.lookups = None
+        self.triggers = None
 
     def configure(self, host, database, **kwargs):
         log.info("Setting up workflow mongo storage with host '%s'", host)
@@ -41,11 +41,11 @@ class MongoStorage:
         self._workflow_templates = WorkflowTemplatesCollection(self._db)
         self._task_templates = TaskTemplatesCollection(self._db)
         self._metadata = MetadataCollection(self._db)
-        self._triggers = TriggerCollection(self._db)
-        self._regexes = DataProcessingCollection(self._db, 'regexes')
-        self._lookups = DataProcessingCollection(self._db, 'lookups')
         self._workflow_instances = WorkflowInstancesCollection(self._db)
         self._task_instances = TaskInstancesCollection(self._db)
+        self.regexes = DataProcessingCollection(self._db, 'regexes')
+        self.lookups = DataProcessingCollection(self._db, 'lookups')
+        self.triggers = TriggerCollection(self._db)
 
     # Templates
 
@@ -151,7 +151,7 @@ class MongoStorage:
         if draft is False:
             await self._task_templates.delete_many(tid)
             await self._metadata.delete(tid)
-            await self._triggers.delete(tid)
+            await self.triggers.delete(tid)
 
     # Instances
 

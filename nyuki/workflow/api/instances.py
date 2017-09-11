@@ -403,7 +403,7 @@ class ApiWorkflowTriggers:
         Return the list of all trigger forms
         """
         try:
-            triggers = await self.nyuki.storage._triggers.get()
+            triggers = await self.nyuki.storage.triggers.get()
         except AutoReconnect:
             return Response(status=503)
         return Response(triggers)
@@ -431,7 +431,7 @@ class ApiWorkflowTriggers:
             tmpl = await self.nyuki.storage.workflow_templates.get_one(tid)
             if not tmpl:
                 return Response(status=404)
-            trigger = await self.nyuki.storage._triggers.insert(tid, content)
+            trigger = await self.nyuki.storage.triggers.insert(tid, content)
         except AutoReconnect:
             return Response(status=503)
         return Response(trigger)
@@ -445,7 +445,7 @@ class ApiWorkflowTrigger:
         Return a single trigger form
         """
         try:
-            trigger = await self.nyuki.storage._triggers.get_one(tid)
+            trigger = await self.nyuki.storage.triggers.get_one(tid)
         except AutoReconnect:
             return Response(status=503)
         if not trigger:
@@ -457,11 +457,11 @@ class ApiWorkflowTrigger:
         Delete a trigger form
         """
         try:
-            trigger = await self.nyuki.storage._triggers.get_one(tid)
+            trigger = await self.nyuki.storage.triggers.get_one(tid)
         except AutoReconnect:
             return Response(status=503)
         if not trigger:
             return Response(status=404)
 
-        await self.nyuki.storage._triggers.delete(tid)
+        await self.nyuki.storage.triggers.delete(tid)
         return Response(trigger)
