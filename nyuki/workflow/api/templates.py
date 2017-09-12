@@ -168,10 +168,10 @@ class ApiTemplate(_TemplateResource):
         Modify the template's metadata
         """
         try:
-            tmpl = await self.nyuki.storage.get_template(tid)
+            templates = await self.nyuki.storage.get_templates(template_id=tid)
         except AutoReconnect:
             return Response(status=503)
-        if not tmpl:
+        if not templates:
             return Response(status=404)
 
         request = await request.json()
