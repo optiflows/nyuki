@@ -28,8 +28,8 @@ class DataInspector(object):
 
     async def required_keys(self, tid, version=None, draft=False):
         try:
-            template = await self.nyuki.storage.workflow_templates.get_one(
-                tid=tid, version=version, draft=draft
+            template = await self.nyuki.storage.get_template(
+                tid, draft=draft, version=version
             )
         except AutoReconnect:
             raise HTTPBreak(503)

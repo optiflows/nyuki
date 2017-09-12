@@ -98,10 +98,8 @@ class ApiWorkflows(_WorkflowResource):
         else:
             # Fetch the template from the storage
             try:
-                template = await self.nyuki.storage.workflow_templates.get_one(
-                    request['id'],
-                    draft=draft,
-                    with_metadata=True
+                template = await self.nyuki.storage.get_template(
+                    request['id'], draft=draft
                 )
             except AutoReconnect:
                 return Response(status=503)
@@ -428,8 +426,8 @@ class ApiWorkflowTriggers:
 
         content = form.file.read().decode('utf-8')
         try:
-            tmpl = await self.nyuki.storage.workflow_templates.get_one(tid)
-            if not tmpl:
+            templates = await self.nyuki.storage.get_templates(template_id=tid)
+            if not templates:
                 return Response(status=404)
             trigger = await self.nyuki.storage.triggers.insert(tid, content)
         except AutoReconnect:
