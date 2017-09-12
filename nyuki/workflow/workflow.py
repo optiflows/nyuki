@@ -16,6 +16,7 @@ from nyuki.bus import reporting
 from nyuki.memory import memsafe
 from nyuki.utils import serialize_object, utcnow
 from nyuki.workflow.db.storage import MongoStorage
+from nyuki.workflow.db.migrations import run_migrations
 from nyuki.workflow.db.task_instances import WS_FILTERS
 
 from .api.factory import (
@@ -237,6 +238,8 @@ class WorkflowNyuki(Nyuki):
 
     async def setup(self):
         self.storage.configure(**self.mongo_config)
+        await self.storage.index()
+        await run_migrations(**self.mongo_config)
         selector = WorkflowSelector(self.storage)
         self.engine = Engine(selector=selector, loop=self.loop)
         for topic in self.topics:

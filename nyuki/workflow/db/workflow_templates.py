@@ -42,7 +42,6 @@ class WorkflowTemplatesCollection:
 
     def __init__(self, db):
         self._templates = db['workflow_templates']
-        asyncio.ensure_future(self.index())
 
     async def index(self):
         await self._templates.create_index('topics')

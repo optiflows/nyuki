@@ -33,7 +33,6 @@ class TaskInstancesCollection:
         self._instances = storage.db['task_instances'].with_options(
             codec_options=CodecOptions(tz_aware=True, tzinfo=timezone.utc)
         )
-        asyncio.ensure_future(self.index())
 
     async def index(self):
         await self._instances.create_index('id', unique=True)

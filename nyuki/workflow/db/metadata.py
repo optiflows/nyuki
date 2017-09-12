@@ -20,7 +20,6 @@ class MetadataCollection:
 
     def __init__(self, db):
         self._metadata = db['workflow_metadata']
-        asyncio.ensure_future(self.index())
 
     async def index(self):
         await self._metadata.create_index('workflow_template_id', unique=True)

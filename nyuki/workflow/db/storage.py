@@ -47,6 +47,16 @@ class MongoStorage:
         self.lookups = DataProcessingCollection(self._db, 'lookups')
         self.triggers = TriggerCollection(self._db)
 
+    async def index(self):
+        await self._workflow_templates.index()
+        await self._task_templates.index()
+        await self._metadata.index()
+        await self._workflow_instances.index()
+        await self._task_instances.index()
+        await self.regexes.index()
+        await self.lookups.index()
+        await self.triggers.index()
+
     # Templates
 
     async def update_metadata(self, tid, metadata):
@@ -182,6 +192,8 @@ class MongoStorage:
 
     async def get_instance(self, instance_id, full=False):
         workflow = await self._workflow_instances.get_one(instance_id, full)
+        if not workflow:
+            return
         workflow['template']['tasks'] = await self._task_instances.get(
             workflow['id'], full
         )

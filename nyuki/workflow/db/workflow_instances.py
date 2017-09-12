@@ -28,14 +28,12 @@ class WorkflowInstancesCollection:
 
     REQUESTER_REGEX = re.compile(r'^nyuki://.*')
 
-    def __init__(self, storage):
-        self._storage = storage
+    def __init__(self, db):
         # Handle timezones in mongo collections.
         # See http://api.mongodb.com/python/current/examples/datetimes.html#reading-time
-        self._instances = storage.db['workflow_instances'].with_options(
+        self._instances = db['workflow_instances'].with_options(
             codec_options=CodecOptions(tz_aware=True, tzinfo=timezone.utc)
         )
-        asyncio.ensure_future(self.index())
 
     async def index(self):
         # Workflow
@@ -44,8 +42,8 @@ class WorkflowInstancesCollection:
         await self._instances.create_index('requester')
         # Search and sorting indexes
         await self._instances.create_index('template.title')
-        await self._instances.create_index('start')
-        await self._instances.create_index('end')
+        await self._instances.create_index([('start', DESCENDING)])
+        await self._instances.create_index([('end', DESCENDING)])
 
     async def get_one(self, exec_id, full=False):
         """

@@ -7,9 +7,11 @@ log = logging.getLogger(__name__)
 
 class DataProcessingCollection:
 
-    def __init__(self, storage, collection_name):
-        self._rules = storage.db[collection_name]
-        asyncio.ensure_future(self._rules.create_index('id', unique=True))
+    def __init__(self, db, collection_name):
+        self._rules = db[collection_name]
+
+    async def index(self):
+        await self._rules.create_index('id', unique=True)
 
     async def get(self):
         """

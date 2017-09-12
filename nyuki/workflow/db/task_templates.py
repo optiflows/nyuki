@@ -24,7 +24,6 @@ class TaskTemplatesCollection:
 
     def __init__(self, db):
         self._templates = db['task_templates']
-        asyncio.ensure_future(self.index())
 
     async def index(self):
         # Pair of indexes on the workflow template id/version

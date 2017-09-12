@@ -9,7 +9,6 @@ class TriggerCollection:
 
     def __init__(self, db):
         self._triggers = db['triggers']
-        asyncio.ensure_future(self.index())
 
     async def index(self):
         await self._triggers.create_index('tid', unique=True)
