@@ -4,6 +4,7 @@ import logging
 from uuid import uuid4
 from bson.objectid import ObjectId
 from pymongo import ASCENDING, DESCENDING
+from pymongo.errors import DuplicateKeyError
 from motor.motor_asyncio import AsyncIOMotorClient
 
 
@@ -30,7 +31,7 @@ class Migration:
         """
         Run the migrations.
         """
-        log.info('Migration started')
+        log.info('Starting migrations')
         collections = await self.db.collection_names()
         if 'metadata' in collections:
             await self._migrate_workflow_metadata()
@@ -220,12 +221,13 @@ class Migration:
             instance['template'] = workflow
             bulk.find({'_id': instance['_id']}).upsert().replace_one(instance)
 
-            task_bulk = tasks_col.initialize_unordered_bulk_op()
-            for task in tasks:
-                task = self._new_task(task, instance['_id'])
-                # This is an older collection, so we don't use '_id'.
-                task_bulk.find({'id': task['id']}).upsert().replace_one(task)
-            await task_bulk.execute()
+            try:
+                await tasks_col.insert_many([
+                    self._new_task(task, instance['id'])
+                    for task in tasks
+                ])
+            except DuplicateKeyError:
+                pass
 
             if i == 1000:
                 await bulk.execute()
