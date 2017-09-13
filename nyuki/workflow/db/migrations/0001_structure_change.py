@@ -2,7 +2,6 @@ import time
 import asyncio
 import logging
 from uuid import uuid4
-from bson.objectid import ObjectId
 from pymongo import ASCENDING, DESCENDING
 from pymongo.errors import DuplicateKeyError
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -18,6 +17,63 @@ def timed(func):
         log.debug("'%s' took %s s", func.__name__, time.time() - start)
         return r
     return wraps
+
+
+class Migrator:
+
+    """
+    Used to fill a collection and progressively erase an old one.
+    """
+
+    def __init__(self, old_collection, new_collection):
+        self._old_collection = old_collection
+        self._new_collection = new_collection
+        self._old_bulk = old_collection.initialize_unordered_bulk_op()
+        self._new_bulk = new_collection.initialize_unordered_bulk_op()
+        self._cursor = old_collection.find()
+        self._batch_size = 0
+        self.count = 0
+
+    @property
+    def old(self):
+        return self._old_bulk
+
+    @property
+    def new(self):
+        return self._new_bulk
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        self._batch_size += 1
+        self.count += 1
+
+        # Insert in bulk. The batch size is a cpu/memory compromise.
+        if self._batch_size == 200:
+            await asyncio.wait([
+                asyncio.ensure_future(self._old_bulk.execute()),
+                asyncio.ensure_future(self._new_bulk.execute()),
+            ])
+            self._batch_size = 0
+            self._old_bulk = self._old_collection.initialize_unordered_bulk_op()
+            self._new_bulk = self._new_collection.initialize_unordered_bulk_op()
+
+        # Return one document.
+        await self._cursor.fetch_next
+        doc = self._cursor.next_object()
+
+        # End of iteration, insert the rest.
+        if not doc:
+            if self._batch_size > 0:
+                await asyncio.wait([
+                    asyncio.ensure_future(self._old_bulk.execute()),
+                    asyncio.ensure_future(self._new_bulk.execute()),
+                ])
+            await self._old_collection.drop()
+            raise StopAsyncIteration
+
+        return doc
 
 
 class Migration:
@@ -47,19 +103,19 @@ class Migration:
 
     @timed
     async def _migrate_workflow_metadata(self):
-        count = 0
-        col = self.db['workflow_metadata']
-        async for metadata in self.db['metadata'].find():
-            count += 1
-            metadata['workflow_template_id'] = metadata.pop('id')
-            await col.replace_one({'_id': metadata['_id']}, metadata, upsert=True)
-        await self.db['metadata'].drop()
-        log.info('%s workflow metadata migrated', count)
+        old_col = self.db['metadata']
+        new_col = self.db['workflow_metadata']
+        migrator = Migrator(old_col, new_col)
+        async for metadata in migrator:
+            migrator.new.insert(metadata)
+            migrator.old.find({'_id': metadata['_id']}).remove_one()
+        log.info('%s workflow metadata migrated', migrator.count)
 
     @timed
     async def _migrate_workflow_templates(self):
         """
         Replace documents with new structure.
+        This uses a particular search filter because of the 'draft' attribute.
         """
         count = 0
         template_state = [None, None]
@@ -114,37 +170,18 @@ class Migration:
         """
         Replace workflow instance documents with new structure.
         """
-        i, count = (0,) * 2
-        col = self.db['workflow_instances']
         old_col = self.db['workflow-instances']
-        bulk = col.initialize_unordered_bulk_op()
-        old_bulk = old_col.initialize_unordered_bulk_op()
-        async for workflow in old_col.find():
-            i += 1
-            count += 1
+        new_col = self.db['workflow_instances']
+        migrator = Migrator(old_col, new_col)
+        async for workflow in migrator:
+            # Convert workflow instance.
             instance = workflow.pop('exec')
             instance['_id'] = workflow.pop('_id')
             instance['template'] = workflow
-            bulk.insert(instance)
-            old_bulk.find({'_id': instance['_id']}).remove_one()
-
-            if i == 1000:
-                await asyncio.wait([
-                    asyncio.ensure_future(bulk.execute()),
-                    asyncio.ensure_future(old_bulk.execute()),
-                ])
-                bulk = col.initialize_unordered_bulk_op()
-                old_bulk = old_col.initialize_unordered_bulk_op()
-                i = 0
-
-        if i > 0:
-            await asyncio.wait([
-                asyncio.ensure_future(bulk.execute()),
-                asyncio.ensure_future(old_bulk.execute()),
-            ])
-
-        await old_col.drop()
-        log.info('%s workflow instances migrated', count)
+            # Insert.
+            migrator.new.insert(instance)
+            migrator.old.find({'_id': instance['_id']}).remove_one()
+        log.info('%s workflow instances migrated', migrator.count)
 
     def _migrate_one_task_template(self, template):
         """
@@ -200,60 +237,41 @@ class Migration:
         """
         Replace documents with new structure.
         """
-        i, count = (0,) * 2
-        col = self.db['task_instances']
         old_col = self.db['task-instances']
-        bulk = col.initialize_unordered_bulk_op()
-        old_bulk = old_col.initialize_unordered_bulk_op()
-        async for task in old_col.find():
-            i += 1
-            count += 1
+        new_col = self.db['task_instances']
+        migrator = Migrator(old_col, new_col)
+        async for task in migrator:
+            # Convert task instance.
             instance = self._new_task(task)
-            bulk.insert(instance)
-            old_bulk.find({'_id': instance['_id']}).remove_one()
-
-            if i == 500:
-                await asyncio.wait([
-                    asyncio.ensure_future(bulk.execute()),
-                    asyncio.ensure_future(old_bulk.execute()),
-                ])
-                bulk = col.initialize_unordered_bulk_op()
-                old_bulk = old_col.initialize_unordered_bulk_op()
-                i = 0
-
-        if i > 0:
-            await asyncio.wait([
-                asyncio.ensure_future(bulk.execute()),
-                asyncio.ensure_future(old_bulk.execute()),
-            ])
-
-        await old_col.drop()
-        log.info('%s task instances migrated', count)
+            # Insert.
+            migrator.new.insert(instance)
+            migrator.old.find({'_id': instance['_id']}).remove_one()
+        log.info('%s task instances migrated', migrator.count)
 
     @timed
     async def _migrate_old_instances(self):
         """
         Bring back the old 'instances' collection from the dead.
         """
-        i, count, task_count = (0,) * 3
+        task_count = 0
         old_col = self.db['instances']
         workflow_col = self.db['workflow_instances']
         task_col = self.db['task_instances']
-        old_bulk = old_col.initialize_unordered_bulk_op()
-        bulk = workflow_col.initialize_unordered_bulk_op()
-        async for workflow in old_col.find():
-            i += 1
-            count += 1
-
+        migrator = Migrator(old_col, workflow_col)
+        async for workflow in migrator:
+            # Split tasks from their workflow instance.
             tasks = workflow.pop('tasks')
+            # Convert workflow instance.
             instance = workflow.pop('exec')
             instance['_id'] = workflow.pop('_id')
             instance['template'] = workflow
-            bulk.insert(instance)
-            old_bulk.find({'_id': instance['_id']}).remove_one()
             task_count += len(tasks)
+            # Insert workflow instance.
+            migrator.new.insert(instance)
+            migrator.old.find({'_id': instance['_id']}).remove_one()
 
             try:
+                # Convert and insert task instances.
                 await task_col.insert_many([
                     self._new_task(task, instance['id'])
                     for task in tasks
@@ -261,25 +279,9 @@ class Migration:
             except DuplicateKeyError:
                 pass
 
-            if i == 500:
-                await asyncio.wait([
-                    asyncio.ensure_future(bulk.execute()),
-                    asyncio.ensure_future(old_bulk.execute()),
-                ])
-                bulk = workflow_col.initialize_unordered_bulk_op()
-                old_bulk = old_col.initialize_unordered_bulk_op()
-                i = 0
-
-        if i > 0:
-            await asyncio.wait([
-                asyncio.ensure_future(bulk.execute()),
-                asyncio.ensure_future(old_bulk.execute()),
-            ])
-
-        await old_col.drop()
         log.info(
             '%s old instances migrated to new format (including %s tasks)',
-            count, task_count,
+            migrator.count, task_count,
         )
 
 
