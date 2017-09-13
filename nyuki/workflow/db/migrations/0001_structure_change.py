@@ -112,23 +112,33 @@ class Migration:
         """
         i = 0
         col = self.db['workflow_instances']
+        old_col = self.db['workflow-instances']
         bulk = col.initialize_unordered_bulk_op()
-        async for workflow in self.db['workflow-instances'].find():
+        old_bulk = old_col.initialize_unordered_bulk_op()
+        async for workflow in old_col.find():
             i += 1
             instance = workflow.pop('exec')
             instance['_id'] = workflow.pop('_id')
             instance['template'] = workflow
-            bulk.find({'_id': instance['_id']}).upsert().replace_one(instance)
+            bulk.insert(instance)
+            old_bulk.find({'_id': instance['_id']}).remove_one()
 
             if i == 1000:
-                await bulk.execute()
+                await asyncio.wait([
+                    asyncio.ensure_future(bulk.execute()),
+                    asyncio.ensure_future(old_bulk.execute()),
+                ])
                 bulk = col.initialize_unordered_bulk_op()
+                old_bulk = old_col.initialize_unordered_bulk_op()
                 i = 0
 
         if i > 0:
-            await bulk.execute()
+            await asyncio.wait([
+                asyncio.ensure_future(bulk.execute()),
+                asyncio.ensure_future(old_bulk.execute()),
+            ])
 
-        await self.db['workflow-instances'].drop()
+        await old_col.drop()
         log.info('Workflow instances migrated')
 
     def _migrate_one_task_template(self, template):
@@ -186,21 +196,31 @@ class Migration:
         """
         i = 0
         col = self.db['task_instances']
+        old_col = self.db['task-instances']
         bulk = col.initialize_unordered_bulk_op()
-        async for task in self.db['task-instances'].find():
+        old_bulk = old_col.initialize_unordered_bulk_op()
+        async for task in old_col.find():
             i += 1
             instance = self._new_task(task)
-            bulk.find({'_id': instance['_id']}).upsert().replace_one(instance)
+            bulk.insert(instance)
+            old_bulk.find({'_id': instance['_id']}).remove_one()
 
             if i == 1000:
-                await bulk.execute()
+                await asyncio.wait([
+                    asyncio.ensure_future(bulk.execute()),
+                    asyncio.ensure_future(old_bulk.execute()),
+                ])
                 bulk = col.initialize_unordered_bulk_op()
+                old_bulk = old_col.initialize_unordered_bulk_op()
                 i = 0
 
         if i > 0:
-            await bulk.execute()
+            await asyncio.wait([
+                asyncio.ensure_future(bulk.execute()),
+                asyncio.ensure_future(old_bulk.execute()),
+            ])
 
-        await self.db['task-instances'].drop()
+        await old_col.drop()
         log.info('Task instances migrated')
 
     @timed
@@ -209,20 +229,23 @@ class Migration:
         Bring back the old 'instances' collection from the dead.
         """
         i = 0
-        workflows_col = self.db['workflow_instances']
-        tasks_col = self.db['task_instances']
-        bulk = workflows_col.initialize_unordered_bulk_op()
-        async for workflow in self.db['instances'].find():
+        old_col = self.db['instances']
+        workflow_col = self.db['workflow_instances']
+        task_col = self.db['task_instances']
+        old_bulk = old_col.initialize_unordered_bulk_op()
+        bulk = workflow_col.initialize_unordered_bulk_op()
+        async for workflow in old_col.find():
             i += 1
 
             tasks = workflow.pop('tasks')
             instance = workflow.pop('exec')
             instance['_id'] = workflow.pop('_id')
             instance['template'] = workflow
-            bulk.find({'_id': instance['_id']}).upsert().replace_one(instance)
+            bulk.insert(instance)
+            old_bulk.find({'_id': instance['_id']}).remove_one()
 
             try:
-                await tasks_col.insert_many([
+                await task_col.insert_many([
                     self._new_task(task, instance['id'])
                     for task in tasks
                 ])
@@ -230,14 +253,21 @@ class Migration:
                 pass
 
             if i == 1000:
-                await bulk.execute()
-                bulk = workflows_col.initialize_unordered_bulk_op()
+                await asyncio.wait([
+                    asyncio.ensure_future(bulk.execute()),
+                    asyncio.ensure_future(old_bulk.execute()),
+                ])
+                bulk = workflow_col.initialize_unordered_bulk_op()
+                old_bulk = old_col.initialize_unordered_bulk_op()
                 i = 0
 
         if i > 0:
-            await bulk.execute()
+            await asyncio.wait([
+                asyncio.ensure_future(bulk.execute()),
+                asyncio.ensure_future(old_bulk.execute()),
+            ])
 
-        await self.db['instances'].drop()
+        await old_col.drop()
         log.info('Old instances migrated to new format')
 
 
