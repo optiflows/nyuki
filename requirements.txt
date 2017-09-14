@@ -6,4 +6,4 @@ jsonschema>=2.6,<2.7
 motor>=1.1,<1.2
 pijon>=0.1,<0.2
 slixmpp>=1.2,<1.3
-tukio>=0.14,<0.15
+tukio>=0.15,<0.16
