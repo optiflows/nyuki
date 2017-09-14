@@ -28,10 +28,10 @@ class TaskInstancesCollection:
         **{'outputs.{}'.format(key): 1 for key in WS_FILTERS}
     }
 
-    def __init__(self, storage):
+    def __init__(self, db):
         # Handle timezones in mongo collections.
         # See http://api.mongodb.com/python/current/examples/datetimes.html#reading-time
-        self._instances = storage.db['task_instances'].with_options(
+        self._instances = db['task_instances'].with_options(
             codec_options=CodecOptions(tz_aware=True, tzinfo=timezone.utc)
         )
 
