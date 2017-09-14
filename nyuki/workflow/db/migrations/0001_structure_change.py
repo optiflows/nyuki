@@ -87,7 +87,7 @@ class Migration:
         """
         Run the migrations.
         """
-        log.info('Starting migrations')
+        log.info("Starting migrations on database '%s'", self.db.name)
         collections = await self.db.collection_names()
         if 'metadata' in collections:
             await self._migrate_workflow_metadata()
@@ -99,7 +99,7 @@ class Migration:
             await self._migrate_task_instances()
         if 'instances' in collections:
             await self._migrate_old_instances()
-        log.info('Migration passed')
+        log.info("Migration on database '%s' passed", self.db.name)
 
     @timed
     async def _migrate_workflow_metadata(self):

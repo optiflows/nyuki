@@ -1,5 +1,5 @@
 import os
-from importlib import util, machinery
+from importlib import util
 
 
 async def run_migrations(*args, **kwargs):

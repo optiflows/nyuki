@@ -1,6 +1,4 @@
-import asyncio
 import logging
-from uuid import uuid4
 
 from pymongo import ReturnDocument
 

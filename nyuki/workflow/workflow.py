@@ -8,11 +8,10 @@ from copy import deepcopy
 from random import shuffle
 from datetime import datetime
 from tukio import Engine, TaskRegistry, get_broker, EXEC_TOPIC
-from tukio.workflow import Workflow, WorkflowTemplate, WorkflowExecState
+from tukio.workflow import Workflow, WorkflowExecState
 from tukio.task.factory import TaskExecState
 
 from nyuki import Nyuki
-from nyuki.bus import reporting
 from nyuki.memory import memsafe
 from nyuki.utils import serialize_object, utcnow
 from nyuki.workflow.db.storage import MongoStorage
