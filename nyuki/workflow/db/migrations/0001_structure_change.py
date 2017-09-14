@@ -193,7 +193,7 @@ class Migration:
         template['timeout'] = None
 
         if template['name'] == 'join':
-            template['timeout'] = config.get('timeout')
+            template['timeout'] = config.pop('timeout', None)
 
         elif template['name'] == 'trigger_workflow':
             template['timeout'] = config.get('timeout')
