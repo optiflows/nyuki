@@ -158,7 +158,7 @@ class TriggerWorkflowTask(TaskHolder):
                         msg = "{}, reason: {}".format(msg, reason['error'])
                     raise RuntimeError(msg)
                 resp_body = await response.json()
-                self.triggered_id = resp_body['exec']['id']
+                self.triggered_id = resp_body['id']
 
         wf_id = '@'.join([self.triggered_id[:8], self.template['service']])
         self.status = WorkflowStatus.RUNNING.value

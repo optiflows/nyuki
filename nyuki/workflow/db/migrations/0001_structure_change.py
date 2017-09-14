@@ -107,6 +107,7 @@ class Migration:
         new_col = self.db['workflow_metadata']
         migrator = Migrator(old_col, new_col)
         async for metadata in migrator:
+            metadata['workflow_template_id'] = metadata.pop('id')
             migrator.new.insert(metadata)
             migrator.old.find({'_id': metadata['_id']}).remove_one()
         log.info('%s workflow metadata migrated', migrator.count)
