@@ -3,7 +3,7 @@ import asyncio
 import logging
 from uuid import uuid4
 from pymongo import ASCENDING, DESCENDING
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import BulkWriteError
 from motor.motor_asyncio import AsyncIOMotorClient
 
 
@@ -277,7 +277,7 @@ class Migration:
                     self._new_task(task, instance['id'])
                     for task in tasks
                 ])
-            except DuplicateKeyError:
+            except BulkWriteError:
                 pass
 
         log.info(

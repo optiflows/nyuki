@@ -24,7 +24,7 @@ class MongoStorage:
         # Collections
         self._workflow_templates = None
         self._task_templates = None
-        self._metadata = None
+        self._workflow_metadata = None
         self._workflow_instances = None
         self._task_instances = None
         self.regexes = None
@@ -40,7 +40,7 @@ class MongoStorage:
         # Collections
         self._workflow_templates = WorkflowTemplatesCollection(self._db)
         self._task_templates = TaskTemplatesCollection(self._db)
-        self._metadata = MetadataCollection(self._db)
+        self._workflow_metadata = MetadataCollection(self._db)
         self._workflow_instances = WorkflowInstancesCollection(self._db)
         self._task_instances = TaskInstancesCollection(self._db)
         self.regexes = DataProcessingCollection(self._db, 'regexes')
@@ -50,7 +50,7 @@ class MongoStorage:
     async def index(self):
         await self._workflow_templates.index()
         await self._task_templates.index()
-        await self._metadata.index()
+        await self._workflow_metadata.index()
         await self._workflow_instances.index()
         await self._task_instances.index()
         await self.regexes.index()
@@ -59,24 +59,24 @@ class MongoStorage:
 
     # Templates
 
-    async def update_metadata(self, tid, metadata):
+    async def update_workflow_metadata(self, tid, metadata):
         """
         Update and return
         """
-        return await self._metadata.update(tid, metadata)
+        return await self._workflow_metadata.update(tid, metadata)
 
     async def upsert_draft(self, template):
         """
         Update a template's draft and all its associated tasks.
         """
-        metadata = await self._metadata.get_one(template['id'])
+        metadata = await self._workflow_metadata.get_one(template['id'])
         if not metadata:
             metadata = {
                 'workflow_template_id': template['id'],
                 'title': template.pop('title'),
                 'tags': template.pop('tags', []),
             }
-            await self._metadata.insert(metadata)
+            await self._workflow_metadata.insert(metadata)
 
         # Force set of values 'version' and 'draft'.
         template['version'] = await self._workflow_templates.get_last_version(
@@ -126,7 +126,7 @@ class MongoStorage:
         """
         templates = await self._workflow_templates.get(template_id, full)
         for template in templates:
-            metadata = await self._metadata.get_one(template['id'])
+            metadata = await self._workflow_metadata.get_one(template['id'])
             template.update(metadata)
             if full is True:
                 template['tasks'] = await self._task_templates.get(
@@ -146,7 +146,7 @@ class MongoStorage:
         if not template:
             return
 
-        metadata = await self._metadata.get_one(tid)
+        metadata = await self._workflow_metadata.get_one(tid)
         template.update(metadata)
         template['tasks'] = await self._task_templates.get(
             template['id'], template['version']
@@ -160,7 +160,7 @@ class MongoStorage:
         await self._workflow_templates.delete(tid, draft)
         if draft is False:
             await self._task_templates.delete_many(tid)
-            await self._metadata.delete(tid)
+            await self._workflow_metadata.delete(tid)
             await self.triggers.delete(tid)
 
     # Instances
