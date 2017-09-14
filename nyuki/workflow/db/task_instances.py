@@ -18,6 +18,7 @@ class TaskInstancesCollection:
         'template.config': 1,
         'template.topics': 1,
         'template.title': 1,
+        'template.timeout': 1,
         # Exec
         'id': 1,
         'start': 1,

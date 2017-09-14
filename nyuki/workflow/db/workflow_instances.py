@@ -45,15 +45,11 @@ class WorkflowInstancesCollection:
         await self._instances.create_index([('start', DESCENDING)])
         await self._instances.create_index([('end', DESCENDING)])
 
-    async def get_one(self, exec_id, full=False):
+    async def get_one(self, instance_id, full=False):
         """
-        Return the instance with `exec_id` from workflow history.
+        Return the instance with `instance_id` from workflow history.
         """
-        fields = {'_id': 0}
-        if full is False:
-            fields['template.graph'] = 0
-
-        return await self._instances.find_one({'id': exec_id}, fields)
+        return await self._instances.find_one({'id': instance_id}, {'_id': 0})
 
     async def get(self, root=False, full=False, offset=None, limit=None,
                   since=None, state=None, search=None, order=None):
@@ -61,7 +57,6 @@ class WorkflowInstancesCollection:
         Return all instances from history from `since` with state `state`.
         """
         query = {}
-        fields = {'_id': 0}
         # Prepare query
         if isinstance(since, datetime):
             query['start'] = {'$gte': since}
@@ -72,11 +67,7 @@ class WorkflowInstancesCollection:
         if search:
             query['template.title'] = {'$regex': '.*{}.*'.format(search)}
 
-        if full is False:
-            # If not a 'full' request, hide the graph as well.
-            fields['template.graph'] = 0
-
-        cursor = self._instances.find(query, fields)
+        cursor = self._instances.find(query, {'_id': 0})
         # Count total results regardless of limit/offset
         count = await cursor.count()
 
