@@ -161,7 +161,8 @@ class Migration:
                     'workflow_template.id': workflow_template['id'],
                     'workflow_template.version': workflow_template['version'],
                 }).upsert().replace_one(task)
-            await task_bulk.execute()
+            if tasks:
+                await task_bulk.execute()
 
         await self.db['templates'].drop()
         log.info('%s workflow templates splited and migrated', count)

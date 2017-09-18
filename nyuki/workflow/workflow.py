@@ -318,6 +318,7 @@ class WorkflowNyuki(Nyuki):
                 del payload['data']['uid']
 
             elif event.data['type'] in (
+                TaskExecState.TIMEOUT.value,
                 TaskExecState.END.value,
                 TaskExecState.ERROR.value,
             ):
