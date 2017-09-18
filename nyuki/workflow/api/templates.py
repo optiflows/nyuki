@@ -177,7 +177,7 @@ class ApiTemplate(_TemplateResource):
         request = await request.json()
 
         # Add ID, request dict cleaned in storage
-        metadata = await self.nyuki.storage.update_metadata(tid, {
+        metadata = await self.nyuki.storage.update_workflow_metadata(tid, {
             'title': request.get('title'),
             'tags': request.get('tags', []),
         })
