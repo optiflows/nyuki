@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from pymongo.errors import AutoReconnect, DuplicateKeyError
 from tukio.workflow import TemplateGraphError, WorkflowTemplate
