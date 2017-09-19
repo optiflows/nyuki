@@ -175,20 +175,10 @@ class TriggerWorkflowTask(TaskHolder):
 
         return self.data
 
-    async def teardown(self):
+    async def _end_triggered_workflow(self):
         """
-        Called when this task is cancelled.
+        Asynchronously cancel the triggered workflow.
         """
-        if self.task.timed_out is True:
-            self.status = WorkflowStatus.TIMEOUT.value
-        else:
-            self.status = WorkflowStatus.DONE.value
-
-        self.task.dispatch_progress({'status': self.status})
-        if not self.triggered_id:
-            log.debug('No workflow to cancel')
-            return
-
         wf_id = '@'.join([self.triggered_id[:8], self.template['service']])
         async with ClientSession() as session:
             url = '{}/instances/{}'.format(self._engine, self.triggered_id)
@@ -198,4 +188,19 @@ class TriggerWorkflowTask(TaskHolder):
                 else:
                     log.info('Workflow %s has been cancelled', wf_id)
 
+    def teardown(self):
+        """
+        Called when this task is cancelled or timed out.
+        """
+        if self.task.timed_out is True:
+            self.status = WorkflowStatus.TIMEOUT.value
+        else:
+            self.status = WorkflowStatus.DONE.value
+
+        self.task.dispatch_progress({'status': self.status})
+        if not self.triggered_id:
+            log.debug('No workflow to cancel')
+            return self.data
+
+        asyncio.ensure_future(self._end_triggered_workflow())
         return self.data
