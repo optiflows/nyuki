@@ -260,7 +260,7 @@ class Migration:
             instance['outputs']['diff'] = instance['reporting']
             instance['reporting'] = None
 
-        elif instance['template']['name'] in ('call', 'send_sms', 'send_email'):
+        if instance['reporting'] and 'contacts' in instance['reporting']:
             if isinstance(instance['reporting']['contacts'], dict):
                 instance['reporting']['contacts'] = list(instance['reporting']['contacts'].values())
 
@@ -444,10 +444,12 @@ class Migration:
                         for contact in old_reporting['emitters']:
                             new_contact = {
                                 'uid': contact['uid'],
-                                'display_name': ' '.join([contact.get('last_name', ''), contact.get('first_name', '')]),
                                 'external': False,
+                                'display_name': ' '.join([contact.get('last_name', ''), contact.get('first_name', '')]),
+                                'input': None,
+                                'source': None,
+                                'received_at': None,
                                 'error': False,
-                                'received_at': '',
                             }
 
                             result = None
@@ -478,12 +480,14 @@ class Migration:
                                         received_at = unknowns[source]
                                     break
 
-                            if result is not None:
-                                new_contact['input'] = result
-                                new_contact['received_at'] = received_at + 'Z'
-                                reporting['inputs']['progress'] += 1
-                                reporting['inputs']['received'][result] += 1
+                            if result is None:
+                                result = 'unknown'
+                                received_at = task['exec']['end']
 
+                            new_contact['input'] = result
+                            new_contact['received_at'] = received_at
+                            reporting['inputs']['progress'] += 1
+                            reporting['inputs']['received'][result] += 1
                             reporting['contacts'].append(new_contact)
 
                         task['exec']['reporting'] = reporting
@@ -550,8 +554,8 @@ class Migration:
                                     'feedback': 'positive' if call.get('promise') is True else 'unknown',
                                     'status': 'completed',
                                     'workflow': call.get('workflow_exec_id'),
-                                    'start': call['start'] + 'Z',
-                                    'end': call['end'] + 'Z' if 'end' in call else None,
+                                    'start': call['start'],
+                                    'end': call['end'] if 'end' in call else None,
                                 })
                             contact.pop('email', None)
                             reporting['contacts'].append(contact)
