@@ -305,17 +305,10 @@ class Migration:
 
             # Convert and insert task instances.
             for index, task in enumerate(tasks):
-
                 if task['exec']:
-                    # Retrieve old quorum ('success').
-                    quorum = None
-                    if task['exec']['outputs'] is not None:
-                        quorum = task['exec']['outputs'].get('success')
                     # Clean inputs/outputs.
                     task['exec']['inputs'] = {}
                     task['exec']['outputs'] = {}
-                    if quorum is not None:
-                        task['exec']['outputs']['quorum'] = quorum
 
                 # Migrate from the old send_email task reporting/config.
                 if task['name'] == 'send_email':
@@ -401,7 +394,7 @@ class Migration:
                         task['exec']['reporting'] = reporting
 
                 # Migrate from the old wait_input task reporting/config.
-                if task['name'] in ('wait_sms', 'wait_email', 'wait_call'):
+                elif task['name'] in ('wait_sms', 'wait_email', 'wait_call'):
                     config = task['config']
                     task['config'] = {
                         'emitters': {'source': 'field', 'value': 'emitters'},
@@ -437,47 +430,57 @@ class Migration:
                         quorum_policy = task['config'].get('quorum_policy')
                         if quorum_policy:
                             reporting['quorum'] = {
-                                'reached': task['exec']['outputs'].get('quorum', False),
+                                'reached': False,
                                 'expected': ceil(quorum_policy['value'] if quorum_policy['method'] == 'count' else (contacts_len * quorum_policy['value']) / 100),
                                 'progress': len(old_reporting['inputs_accepted']),
                             }
+                            reached = (reporting['quorum']['progress'] >= reporting['quorum']['expected'])
+                            reporting['quorum']['reached'] = reached
+                            task['exec']['outputs']['quorum'] = reached
 
                         # Contacts
-                        positives = [contact['source'] for contact in old_reporting['inputs_accepted']]
-                        unknowns = [contact['source'] for contact in old_reporting['inputs_invalid']]
+                        positives = {contact['source']: contact['time'] for contact in old_reporting['inputs_accepted']}
+                        unknowns = {contact['source']: contact['time'] for contact in old_reporting['inputs_invalid']}
                         for contact in old_reporting['emitters']:
                             new_contact = {
                                 'uid': contact['uid'],
                                 'display_name': ' '.join([contact.get('last_name', ''), contact.get('first_name', '')]),
                                 'external': False,
                                 'error': False,
-                                'received_at': 'lol',
+                                'received_at': '',
                             }
 
                             result = None
                             if task['name'] == 'wait_sms':
                                 source = contact.get('mobile')
-                                if source in positives:
+                                if source in positives.keys():
                                     result = 'positive'
+                                    received_at = positives[source]
                                 elif source in unknowns:
                                     result = 'unknown'
+                                    received_at = unknowns[source]
                             elif task['name'] == 'wait_email':
                                 source = contact.get('email')
                                 if source in positives:
                                     result = 'positive'
+                                    received_at = positives[source]
                                 elif source in unknowns:
                                     result = 'unknown'
+                                    received_at = unknowns[source]
                             elif task['name'] == 'wait_call':
                                 for media in ('mobile', 'phone_work', 'phone_home'):
                                     source = contact.get(media)
                                     if source in positives:
                                         result = 'positive'
+                                        received_at = positives[source]
                                     elif source in unknowns:
                                         result = 'unknown'
+                                        received_at = unknowns[source]
                                     break
 
                             if result is not None:
                                 new_contact['input'] = result
+                                new_contact['received_at'] = received_at + 'Z'
                                 reporting['inputs']['progress'] += 1
                                 reporting['inputs']['received'][result] += 1
 
@@ -521,10 +524,13 @@ class Migration:
                         quorum_policy = task['config'].get('quorum_policy')
                         if quorum_policy:
                             reporting['quorum'] = {
-                                'reached': task['exec']['outputs'].get('quorum', False),
+                                'reached': False,
                                 'expected': ceil(quorum_policy['value'] if quorum_policy['method'] == 'count' else (contacts_len * quorum_policy['value']) / 100),
                                 'progress': old_reporting['promises']['count'],
                             }
+                            reached = (reporting['quorum']['progress'] >= reporting['quorum']['expected'])
+                            reporting['quorum']['reached'] = reached
+                            task['exec']['outputs']['quorum'] = reached
                         # Contacts
                         for contact in old_reporting['contacts'].values():
                             contact['display_name'] = ' '.join([contact.pop('last_name', ''), contact.pop('first_name', '')])
