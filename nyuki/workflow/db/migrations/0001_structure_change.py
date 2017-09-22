@@ -1,6 +1,7 @@
 import time
 import asyncio
 import logging
+from math import ceil
 from uuid import uuid4
 from pymongo import ASCENDING, DESCENDING
 from pymongo.errors import BulkWriteError
@@ -207,10 +208,16 @@ class Migration:
                 },
             }
 
-        elif template['name'] in ['call', 'wait_sms', 'wait_email', 'wait_call']:
+        elif template['name'] in ['send_sms', 'call', 'wait_sms', 'wait_email', 'wait_call']:
             if 'blocking' in config:
                 template['timeout'] = config['blocking']['timeout']
-                template['config']['blocking'] = True
+                config['blocking'] = True
+
+        elif template['name'] in ['gather', 'record']:
+            if 'finishOnKey' in config:
+                config['finish_on_key'] = config.pop('finishOnKey')
+            if 'numDigits' in config:
+                config['num_digits'] = config.pop('numDigits')
 
         return template
 
@@ -232,6 +239,31 @@ class Migration:
             instance['_id'] = task.pop('_id')
         instance['workflow_instance_id'] = workflow_instance_id or task.pop('workflow_exec_id')
         instance['template'] = self._migrate_one_task_template(task)
+
+        if instance['reporting'] is None:
+            return instance
+
+        # Reporting migrations
+        if instance['template']['name'] == 'group_selector':
+            rgroups = instance['reporting'].get('groups', {})
+            if isinstance(rgroups, dict):
+                new_reporting = []
+                for gid, medias in rgroups.items():
+                    new_reporting.append({
+                        'name': '',
+                        'medias': medias,
+                        'uid': gid,
+                    })
+                instance['reporting'] = {'groups': new_reporting}
+
+        elif instance['template']['name'] == 'factory':
+            instance['outputs']['diff'] = instance['reporting']
+            instance['reporting'] = None
+
+        elif instance['template']['name'] in ('call', 'send_sms', 'send_email'):
+            if isinstance(instance['reporting']['contacts'], dict):
+                instance['reporting']['contacts'] = list(instance['reporting']['contacts'].values())
+
         return instance
 
     @timed
@@ -254,6 +286,8 @@ class Migration:
     async def _migrate_old_instances(self):
         """
         Bring back the old 'instances' collection from the dead.
+        These documents are way more older than the others, so the migrations
+        are a bit more complex and specific.
         """
         task_count = 0
         old_col = self.db['instances']
@@ -268,18 +302,267 @@ class Migration:
             instance['_id'] = workflow.pop('_id')
             instance['template'] = workflow
             task_count += len(tasks)
+
+            # Convert and insert task instances.
+            for index, task in enumerate(tasks):
+
+                if task['exec']:
+                    # Retrieve old quorum ('success').
+                    quorum = None
+                    if task['exec']['outputs'] is not None:
+                        quorum = task['exec']['outputs'].get('success')
+                    # Clean inputs/outputs.
+                    task['exec']['inputs'] = {}
+                    task['exec']['outputs'] = {}
+                    if quorum is not None:
+                        task['exec']['outputs']['quorum'] = quorum
+
+                # Migrate from the old send_email task reporting/config.
+                if task['name'] == 'send_email':
+                    config = task['config']
+                    task['config'] = {
+                        'recipients': {'source': 'field', 'value': 'recipients'},
+                        'subject': config['subject'],
+                        'message': config['message'],
+                        'default_placeholder': config.get('default_placeholder', ''),
+                        'sender': {'address': config.get('sender')},
+                    }
+
+                    if task['exec'] and task['exec']['reporting'] is not None:
+                        old_reporting = task['exec']['reporting']
+                        contacts_len = len(old_reporting['contacts'])
+                        reporting = {
+                            'subject': old_reporting['subject'],
+                            'message': old_reporting['message'],
+                            'contacts': [],
+                            'delivery': {
+                                'expected': contacts_len,
+                                'sent': 0,
+                                'error': 0,
+                            },
+                        }
+                        # Contacts
+                        for contact in old_reporting['contacts'].values():
+                            new_contact = {
+                                'display_name': ' '.join([contact.pop('last_name', ''), contact.pop('first_name', '')]),
+                                'external': False,
+                                'email': contact.get('email'),
+                            }
+                            if contact['state'] == 'sent':
+                                reporting['delivery']['sent'] += 1
+                                new_contact['state'] = 'sent'
+                            elif contact['state'] in ('pending', 'error'):
+                                new_contact['state'] = 'error'
+                                reporting['delivery']['error'] += 1
+                            reporting['contacts'].append(new_contact)
+
+                        task['exec']['reporting'] = reporting
+
+                # Migrate from the old send_sms task reporting/config.
+                elif task['name'] == 'send_sms':
+                    config = task['config']
+                    task['config'] = {
+                        'recipients': {'source': 'field', 'value': 'recipients'},
+                        'message': config['message'],
+                        'encoding': config.get('encoding', 'utf-8'),
+                        'max_sms': config.get('max_sms'),
+                        'default_placeholder': config.get('default_placeholder', ''),
+                    }
+
+                    if task['exec'] and task['exec']['reporting'] is not None:
+                        old_reporting = task['exec']['reporting']
+                        contacts_len = len(old_reporting['contacts'])
+                        reporting = {
+                            'message': old_reporting['message'],
+                            'contacts': [],
+                            'delivery': {
+                                'expected': contacts_len,
+                                'sent': 0,
+                                'error': 0,
+                            },
+                        }
+                        # Contacts
+                        for contact in old_reporting['contacts'].values():
+                            new_contact = {
+                                'display_name': ' '.join([contact.pop('last_name', ''), contact.pop('first_name', '')]),
+                                'external': False,
+                                'mobile': contact.get('mobile'),
+                            }
+                            if contact['state'] == 'started':
+                                reporting['delivery']['sent'] += 1
+                                new_contact['state'] = 'sent'
+                            elif contact['state'] == 'done':
+                                new_contact['state'] = 'delivered'
+                            elif contact['state'] == 'error':
+                                reporting['delivery']['error'] += 1
+                                new_contact['state'] = 'error'
+                            reporting['contacts'].append(new_contact)
+
+                        task['exec']['reporting'] = reporting
+
+                # Migrate from the old wait_input task reporting/config.
+                if task['name'] in ('wait_sms', 'wait_email', 'wait_call'):
+                    config = task['config']
+                    task['config'] = {
+                        'emitters': {'source': 'field', 'value': 'emitters'},
+                        'rules': config['rules'],
+                    }
+                    if 'timeout' in config:
+                        # This field will go away shortly after.
+                        task['config']['blocking'] = {'timeout': config['timeout']}
+                    # 'success_condition' => 'quorum_policy'
+                    if 'success_condition' in config:
+                        task['config']['quorum_policy'] = {
+                            'method': 'count' if config['success_condition']['type'] == 'number' else 'rate',
+                            'value': config['success_condition']['value'],
+                        }
+
+                    if task['exec'] and task['exec']['reporting'] is not None and 'emitters' in task['exec']['reporting']:
+                        old_reporting = task['exec']['reporting']
+                        contacts_len = len(old_reporting['emitters'])
+                        reporting = {
+                            'contacts': [],
+                            'inputs': {
+                                'expected': contacts_len,
+                                'progress': 0,
+                                'received': {
+                                    'positive': 0,
+                                    'negative': 0,
+                                    'unknown': 0,
+                                },
+                                'failed': 0
+                            }
+                        }
+                        # Quorum
+                        quorum_policy = task['config'].get('quorum_policy')
+                        if quorum_policy:
+                            reporting['quorum'] = {
+                                'reached': task['exec']['outputs'].get('quorum', False),
+                                'expected': ceil(quorum_policy['value'] if quorum_policy['method'] == 'count' else (contacts_len * quorum_policy['value']) / 100),
+                                'progress': len(old_reporting['inputs_accepted']),
+                            }
+
+                        # Contacts
+                        positives = [contact['source'] for contact in old_reporting['inputs_accepted']]
+                        unknowns = [contact['source'] for contact in old_reporting['inputs_invalid']]
+                        for contact in old_reporting['emitters']:
+                            new_contact = {
+                                'uid': contact['uid'],
+                                'display_name': ' '.join([contact.get('last_name', ''), contact.get('first_name', '')]),
+                                'external': False,
+                                'error': False,
+                                'received_at': 'lol',
+                            }
+
+                            result = None
+                            if task['name'] == 'wait_sms':
+                                source = contact.get('mobile')
+                                if source in positives:
+                                    result = 'positive'
+                                elif source in unknowns:
+                                    result = 'unknown'
+                            elif task['name'] == 'wait_email':
+                                source = contact.get('email')
+                                if source in positives:
+                                    result = 'positive'
+                                elif source in unknowns:
+                                    result = 'unknown'
+                            elif task['name'] == 'wait_call':
+                                for media in ('mobile', 'phone_work', 'phone_home'):
+                                    source = contact.get(media)
+                                    if source in positives:
+                                        result = 'positive'
+                                    elif source in unknowns:
+                                        result = 'unknown'
+                                    break
+
+                            if result is not None:
+                                new_contact['input'] = result
+                                reporting['inputs']['progress'] += 1
+                                reporting['inputs']['received'][result] += 1
+
+                            reporting['contacts'].append(new_contact)
+
+                        task['exec']['reporting'] = reporting
+
+                # Migrate from the old call task reporting/config.
+                elif task['name'] == 'call':
+                    config = task['config']
+                    task['config'] = {
+                        'recipients': {'source': 'field', 'value': 'recipients'},
+                        'template': {'id': config['template'], 'draft': config.get('draft', False)},
+                    }
+                    if 'global_timeout' in config:
+                        # This field will go away shortly after.
+                        task['config']['blocking'] = {'timeout': config['global_timeout']}
+                    # 'success_condition' => 'quorum_policy'
+                    if 'success_condition' in config:
+                        task['config']['quorum_policy'] = {
+                            'method': 'count' if config['success_condition']['type'] == 'number' else 'rate',
+                            'value': config['success_condition']['value'],
+                        }
+                    if task['exec'] and task['exec']['reporting'] is not None:
+                        old_reporting = task['exec']['reporting']
+                        contacts_len = len(old_reporting['contacts'])
+                        reporting = {
+                            'contacts': [],
+                            'feedbacks': {
+                                'expected': contacts_len,
+                                'progress': contacts_len,
+                                'received': {
+                                    'positive': 0,
+                                    'negative': 0,
+                                    'unknown': 0,
+                                },
+                                'failed': 0
+                            }
+                        }
+                        # Quorum
+                        quorum_policy = task['config'].get('quorum_policy')
+                        if quorum_policy:
+                            reporting['quorum'] = {
+                                'reached': task['exec']['outputs'].get('quorum', False),
+                                'expected': ceil(quorum_policy['value'] if quorum_policy['method'] == 'count' else (contacts_len * quorum_policy['value']) / 100),
+                                'progress': old_reporting['promises']['count'],
+                            }
+                        # Contacts
+                        for contact in old_reporting['contacts'].values():
+                            contact['display_name'] = ' '.join([contact.pop('last_name', ''), contact.pop('first_name', '')])
+                            contact['external'] = False
+                            contact['attempts'] = 1
+                            contact['feedback'] = 'unknown'
+                            contact['calls'] = []
+                            medias = contact.pop('medias', {})
+                            for media, call in medias.items():
+                                if call.get('promise') is True:
+                                    contact['feedback'] = 'positive'
+                                contact['calls'].append({
+                                    'uid': str(uuid4())[:8],
+                                    'media': media,
+                                    'number': contact.pop(media, None),
+                                    'attempt': 1,
+                                    'feedback': 'positive' if call.get('promise') is True else 'unknown',
+                                    'status': 'completed',
+                                    'workflow': call.get('workflow_exec_id'),
+                                    'start': call['start'] + 'Z',
+                                    'end': call['end'] + 'Z' if 'end' in call else None,
+                                })
+                            contact.pop('email', None)
+                            reporting['contacts'].append(contact)
+                            reporting['feedbacks']['received'][contact['feedback']] += 1
+
+                        task['exec']['reporting'] = reporting
+
+                tasks[index] = self._new_task(task, instance['id'])
+
+            try:
+                await task_col.insert_many(tasks)
+            except BulkWriteError:
+                pass
+
             # Insert workflow instance.
             migrator.new.insert(instance)
             migrator.old.find({'_id': instance['_id']}).remove_one()
-
-            try:
-                # Convert and insert task instances.
-                await task_col.insert_many([
-                    self._new_task(task, instance['id'])
-                    for task in tasks
-                ])
-            except BulkWriteError:
-                pass
 
         log.info(
             '%s old instances migrated to new format (including %s tasks)',

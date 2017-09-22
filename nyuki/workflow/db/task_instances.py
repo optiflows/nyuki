@@ -1,11 +1,10 @@
-import asyncio
 import logging
 from datetime import timezone
 from bson.codec_options import CodecOptions
 
 
 log = logging.getLogger(__name__)
-WS_FILTERS = ('quorum', 'status', 'twilio_error', 'timeout', 'diff')
+WS_FILTERS = ('quorum', 'status', 'twilio_error', 'diff')
 
 
 class TaskInstancesCollection:

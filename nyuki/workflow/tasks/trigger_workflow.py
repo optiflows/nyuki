@@ -1,7 +1,6 @@
 import json
 import asyncio
 import logging
-from uuid import uuid4
 from enum import Enum
 from aiohttp import ClientSession
 from tukio.task import register
@@ -108,7 +107,7 @@ class TriggerWorkflowTask(TaskHolder):
 
         # Handle blocking trigger_workflow using mqtt
         if self.blocking:
-            topic = '{}/async/{}'.format(runtime.bus.name, str(uuid4())[:8])
+            topic = '{}/async/{}'.format(runtime.bus.name, self.uid[:8])
             headers['X-Surycat-Async-Topic'] = topic
             headers['X-Surycat-Async-Events'] = ','.join([
                 WorkflowExecState.END.value,
