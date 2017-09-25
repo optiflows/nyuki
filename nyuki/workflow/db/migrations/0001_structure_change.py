@@ -202,8 +202,8 @@ class Migration:
             template['config'] = {
                 'blocking': config.get('await_completion', True),
                 'template': {
-                    'service': 'twilio' if 'twilio' in config['nyuki_api'] else 'pipeline',
-                    'id': config['template'],
+                    'service': 'twilio' if 'twilio' in config.get('nyuki_api', '') else 'pipeline',
+                    'id': config.get('template', ''),
                     'draft': config.get('draft', False),
                 },
             }
