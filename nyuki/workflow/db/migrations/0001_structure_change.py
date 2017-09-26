@@ -213,11 +213,22 @@ class Migration:
                 template['timeout'] = config['blocking']['timeout']
                 config['blocking'] = True
 
-        elif template['name'] in ['gather', 'record']:
+        elif template['name'] == 'gather':
             if 'finishOnKey' in config:
                 config['finish_on_key'] = config.pop('finishOnKey')
             if 'numDigits' in config:
                 config['num_digits'] = config.pop('numDigits')
+            # Remove finish_on_key if num_digits is 1
+            if 'finish_on_key' in config and config.get('num_digits') == 1:
+                del config['finish_on_key']
+
+        elif template['name'] == 'record':
+            if 'finishOnKey' in config:
+                config['finish_on_key'] = config.pop('finishOnKey')
+            if 'maxLength' in config:
+                config['max_length'] = config.pop('maxLength')
+            if 'playBeep' in config:
+                config['play_beep'] = config.pop('playBeep')
 
         return template
 
