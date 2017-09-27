@@ -317,9 +317,10 @@ class Migration:
             # Convert and insert task instances.
             for index, task in enumerate(tasks):
                 if task['exec']:
-                    # Clean inputs/outputs.
-                    task['exec']['inputs'] = {}
-                    task['exec']['outputs'] = {}
+                    # Set inputs and outputs as dicts (could be None).
+                    for io in ('inputs', 'outputs'):
+                        if not isinstance(task['exec'][io], dict):
+                            task['exec'][io] = {}
 
                 # Migrate from the old send_email task reporting/config.
                 if task['name'] == 'send_email':
