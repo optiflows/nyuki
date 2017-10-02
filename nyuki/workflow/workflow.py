@@ -342,6 +342,7 @@ class WorkflowNyuki(Nyuki):
             WorkflowExecState.END.value,
             WorkflowExecState.ERROR.value
         ]:
+            payload['data'] = event.data.get('content') or {}
             # Sanitize objects to store the finished workflow instance
             asyncio.ensure_future(self.storage.insert_instance(
                 sanitize_workflow_exec(wflow.report())
