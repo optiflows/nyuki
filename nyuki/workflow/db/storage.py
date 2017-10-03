@@ -33,7 +33,7 @@ class MongoStorage:
         self.lookups = None
         self.triggers = None
 
-    def configure(self, host, database, validate_on_start=False, **kwargs):
+    def configure(self, host, database, validate_on_start=True, **kwargs):
         log.info(
             "Setting up mongo storage with host '%s' and database '%s'",
             host, database,
