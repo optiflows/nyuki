@@ -21,6 +21,7 @@ class MongoStorage:
     def __init__(self):
         self._client = None
         self._db = None
+        self._validate_on_start = False
 
         # Collections
         self._workflow_templates = None
@@ -32,11 +33,14 @@ class MongoStorage:
         self.lookups = None
         self.triggers = None
 
-    def configure(self, host, database, **kwargs):
-        log.info("Setting up workflow mongo storage with host '%s'", host)
+    def configure(self, host, database, validate_on_start=False, **kwargs):
+        log.info(
+            "Setting up mongo storage with host '%s' and database '%s'",
+            host, database,
+        )
         self._client = AsyncIOMotorClient(host, **kwargs)
         self._db = self._client[database]
-        log.info("Workflow database: '%s'", database)
+        self._validate_on_start = validate_on_start
 
         # Collections
         self._workflow_templates = WorkflowTemplatesCollection(self._db)
@@ -68,6 +72,13 @@ class MongoStorage:
             else:
                 log.info('Successfully connected to Mongo')
                 break
+
+        if self._validate_on_start is True:
+            collections = await self._db.collection_names()
+            log.info('Validating %s collections', len(collections))
+            for collection in collections:
+                await self._db.validate_collection(collection)
+                log.info('Validated collection %s', collection)
 
     # Templates
 

@@ -171,7 +171,8 @@ class WorkflowNyuki(Nyuki):
                 'required': ['host', 'database'],
                 'properties': {
                     'host': {'type': 'string', 'minLength': 1},
-                    'database': {'type': 'string', 'minLength': 1}
+                    'database': {'type': 'string', 'minLength': 1},
+                    'validate_on_start': {'type': 'boolean', 'default': True},
                 }
             },
             'topics': {

@@ -79,7 +79,7 @@ class Migrator:
 
 class Migration:
 
-    def __init__(self, host, database, **kwargs):
+    def __init__(self, host, database, validate_on_start=None, **kwargs):
         client = AsyncIOMotorClient(host, **kwargs)
         self.db = client[database]
 
