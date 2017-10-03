@@ -2,6 +2,7 @@ import logging
 from copy import deepcopy
 
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import ServerSelectionTimeoutError
 
 from .triggers import TriggerCollection
 from .data_processing import DataProcessingCollection
@@ -48,14 +49,25 @@ class MongoStorage:
         self.triggers = TriggerCollection(self._db)
 
     async def index(self):
-        await self._workflow_templates.index()
-        await self._task_templates.index()
-        await self._workflow_metadata.index()
-        await self._workflow_instances.index()
-        await self._task_instances.index()
-        await self.regexes.index()
-        await self.lookups.index()
-        await self.triggers.index()
+        """
+        Try to connect to mongo and index all the collections.
+        """
+        log.info('Trying to connect to Mongo...')
+        while True:
+            try:
+                await self._workflow_templates.index()
+                await self._task_templates.index()
+                await self._workflow_metadata.index()
+                await self._workflow_instances.index()
+                await self._task_instances.index()
+                await self.regexes.index()
+                await self.lookups.index()
+                await self.triggers.index()
+            except ServerSelectionTimeoutError as exc:
+                log.error('Could not connect to Mongo - %s', exc)
+            else:
+                log.info('Successfully connected to Mongo')
+                break
 
     # Templates
 

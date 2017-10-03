@@ -237,6 +237,7 @@ class WorkflowNyuki(Nyuki):
 
     async def setup(self):
         self.storage.configure(**self.mongo_config)
+        # Blocks until connection to Mongo is done.
         await self.storage.index()
         await run_migrations(**self.mongo_config)
         selector = WorkflowSelector(self.storage)
