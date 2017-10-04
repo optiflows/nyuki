@@ -119,7 +119,7 @@ FACTORY_SCHEMAS = {
 @register('factory', 'execute')
 class FactoryTask(TaskHolder):
 
-    __slots__ = ('api_url')
+    __slots__ = ('api_url', 'session')
 
     SCHEMA = generate_factory_schema(**FACTORY_SCHEMAS)
 
@@ -128,13 +128,14 @@ class FactoryTask(TaskHolder):
         self.api_url = 'http://localhost:{}/v1/workflow'.format(
             runtime.config['api']['port']
         )
+        self.session = None
 
-    async def get_regex(self, session, rule):
+    async def get_regex(self, rule):
         """
         Query the nyuki to get the actual regexes from their IDs
         """
         url = '{}/regexes/{}'.format(self.api_url, rule['regex_id'])
-        async with session.get(url) as resp:
+        async with self.session.get(url) as resp:
             if resp.status != 200:
                 raise RuntimeError(
                     'Could not find regex with id {}'.format(
@@ -145,12 +146,12 @@ class FactoryTask(TaskHolder):
             rule['pattern'] = data['pattern']
             del rule['regex_id']
 
-    async def get_lookup(self, session, rule):
+    async def get_lookup(self, rule):
         """
         Query the nyuki to get the actual lookup tables from their IDs
         """
         url = '{}/lookups/{}'.format(self.api_url, rule['lookup_id'])
-        async with session.get(url) as resp:
+        async with self.session.get(url) as resp:
             if resp.status != 200:
                 raise RuntimeError(
                     'Could not find lookup table with id {}'.format(
@@ -169,17 +170,20 @@ class FactoryTask(TaskHolder):
         Iterate through the task's configuration to swap from their IDs to
         their database equivalent within the nyuki
         """
-        async with ClientSession() as session:
-            for rule in config['rules']:
-                if rule['type'] in ['extract', 'sub']:
-                    await self.get_regex(session, rule)
-                elif rule['type'] == 'lookup':
-                    await self.get_lookup(session, rule)
+        for rule in config['rules']:
+            if rule['type'] in ['extract', 'sub']:
+                await self.get_regex(rule)
+            elif rule['type'] == 'lookup':
+                await self.get_lookup(rule)
+            elif rule['type'] == 'condition-block':
+                for condition in rule['conditions']:
+                    await self.get_factory_rules(condition)
 
     async def execute(self, event):
         data = event.data
         runtime_config = deepcopy(self.config)
-        await self.get_factory_rules(runtime_config)
+        async with ClientSession() as self.session:
+            await self.get_factory_rules(runtime_config)
         log.debug('Full factory config: %s', runtime_config)
 
         converter = Converter.from_dict(runtime_config)
