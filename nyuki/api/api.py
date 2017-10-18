@@ -231,7 +231,7 @@ class Api(Service):
     async def stop(self):
         log.info('Stopped the http server')
         self._server.close()
-        await self._handler.finish_connections()
+        await self._handler.shutdown()
         await self._server.wait_closed()
         self._app = None
         self._handler = None

@@ -1,5 +1,5 @@
 aiodns>=1.1,<1.2
-aiohttp>=2.2,<2.3
+aiohttp>=2.3,<2.4
 aioredis>=0.3,<0.4
 hbmqtt>=0.9,<0.10
 jsonschema>=2.6,<2.7
