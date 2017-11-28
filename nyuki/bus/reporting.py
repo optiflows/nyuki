@@ -13,11 +13,6 @@ log = logging.getLogger(__name__)
 
 class Reporter(object):
 
-    """
-    Mqtt and Xmpp bus are handled differently as the topics mechanism
-    is not the same.
-    """
-
     EXCEPTION_TTL = 3600
     MONIT_TOPIC = '+/monitoring'
 
@@ -35,16 +30,14 @@ class Reporter(object):
         self._publisher = publisher
         self._service = self._publisher.SERVICE
 
-        if self._service == 'xmpp':
-            self._channel = 'monitoring'
-        elif self._service == 'mqtt':
+        if self._service == 'mqtt':
             self._channel = self.MONIT_TOPIC.replace('+', self._name)
         else:
-            raise TypeError('Nyuki publisher must be XmppBus or MqttBus')
+            raise TypeError('Nyuki publisher must be MqttBus')
 
     async def _handle_report(self, topic, data):
         """
-        Handle XMPP report, ignore if it comes from this reporter
+        Handle an error report, ignore if it comes from this reporter
         """
         if self._handler is None:
             log.debug('Report received, no handler set')

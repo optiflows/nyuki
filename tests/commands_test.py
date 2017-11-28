@@ -11,8 +11,6 @@ class TestCommand(TestCase):
         # Arguments parsed
         args = Mock()
         args.config = 'config.json'
-        args.jid = 'test@localhost'
-        args.password = 'test'
         args.server = '127.0.0.1:5555'
         args.api = 'localhost:8082'
         args.logging = 'DEBUG'
@@ -24,8 +22,6 @@ class TestCommand(TestCase):
             'bus': {
                 'host': '127.0.0.1',
                 'port': 5555,
-                'jid': 'test@localhost',
-                'password': 'test'
             },
             'api': {
                 'host': 'localhost',

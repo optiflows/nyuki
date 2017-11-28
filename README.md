@@ -9,10 +9,10 @@
 A lightweight Python library designed to implement agents (aka nyukis). It provides features that shall help developers with managing the following topics:
 
 * Expose service features through a RESTful API
-* Communication between nyukis (over HTTP, XMPP or MQTT)
+* Communication between nyukis (over HTTP or MQTT)
 * Helpers for asyncio-based programming
 
-This library has been written with a focus on reliability and developer-friendliness. Its design promotes single-threaded and asynchronous coding style through the extensive use of the [Python asyncio](https://docs.python.org/3/library/asyncio.html) event loop. A single loop is used to manage HTTP, XMPP-based and MQTT-based communications as well as executing internal logic. Nyukis are suited for Agent-Oriented Programming and very useful to build distributed systems and scalable services.
+This library has been written with a focus on reliability and developer-friendliness. Its design promotes single-threaded and asynchronous coding style through the extensive use of the [Python asyncio](https://docs.python.org/3/library/asyncio.html) event loop. A single loop is used to manage HTTP and MQTT-based communications as well as executing internal logic. Nyukis are suited for Agent-Oriented Programming and very useful to build distributed systems and scalable services.
 
 ## What is a nyuki?
 A nyuki (a bee in Swahili) is an entity designed for real-time data processing (stream processing). Tying together several nyukis allows nearly unlimited use cases: from home automation (e.g. warm up my home when you're less than 5 miles away) to smart industries (lower down pressure and notify staff upon reaching a temperature threshold). This is up to the developer to write his own user story! Following that philosophy, nyukis are the nuts and bolts that helped design [Surycat](http://www.surycat.com).
@@ -22,7 +22,7 @@ Here is a list of core concepts tied to a nyuki:
 * A nyuki runs as a standalone process
 * A nyuki manages its own storage area (if it has data to store)
 * A nyuki provides its own HTTP RESTful API
-* A nyuki is connected to a bus for 1-to-many communication with other nyukis (currently using XMPP MUC or MQTT)
+* A nyuki is connected to a bus for 1-to-many communication with other nyukis (currently using MQTT)
 
 ## Requirements
 All you need is a Python interpreter. At the moment, only **Python 3.5** is supported.
@@ -33,10 +33,6 @@ Install the nyuki library:
 ```bash
 pip install nyuki
 ```
-
-Using *XMPP* as a bus service require some specific configuration:
-* MUCs
-* Automatic subscription
 
 Nyuki's paradigms are convenient for Docker-based environment. We recommend using one container per nyuki implementation.
 

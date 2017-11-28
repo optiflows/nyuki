@@ -71,7 +71,6 @@ class MqttBus(Service):
 
     def __init__(self, nyuki, loop=None):
         self._nyuki = nyuki
-        nyuki.register_schema(self.CONF_SCHEMA)
         self._loop = loop or asyncio.get_event_loop()
         self._host = None
         self.client = None
@@ -91,6 +90,8 @@ class MqttBus(Service):
     def configure(self, name, scheme='mqtt', host='localhost', port=1883,
                   cafile=None, certfile=None, keyfile=None, persistence={},
                   service=None, keep_alive=60, ping_delay=5):
+
+        self._nyuki.register_schema(self.CONF_SCHEMA)
         if scheme in ['mqtts', 'wss']:
             if not cafile or not certfile or not keyfile:
                 raise ValueError(

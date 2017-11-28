@@ -10,7 +10,7 @@ from signal import SIGHUP, SIGINT, SIGTERM
 from .api import Api
 from .api.bus import ApiBusReplay, ApiBusTopics, ApiBusPublish
 from .api.config import ApiConfiguration, ApiSwagger
-from .bus import XmppBus, MqttBus, reporting
+from .bus import MqttBus, reporting
 from .commands import get_command_kwargs
 from .config import get_full_config, write_conf_json, merge_configs
 from .debugging import StackSampler, ApiSampleEmitter
@@ -47,6 +47,7 @@ class Nyuki:
             'trace': {'type': 'boolean'},
         }
     }
+
     # API endpoints
     HTTP_RESOURCES = [
         ApiBusPublish,
@@ -89,13 +90,11 @@ class Nyuki:
         self._services = ServiceManager(self)
         self._services.add('api', Api(self))
 
-        # Add bus service if in conf file, xmpp (default) or mqtt
+        # Add bus service if in conf file
         bus_config = self._config.get('bus')
         if bus_config is not None:
-            bus_service = bus_config.get('service', 'xmpp')
-            if bus_service == 'xmpp':
-                self._services.add('bus', XmppBus(self))
-            elif bus_service == 'mqtt':
+            bus_service = bus_config.get('service', 'mqtt')
+            if bus_service == 'mqtt':
                 self._services.add('bus', MqttBus(self))
 
         # Add NaaS (nyuki-as-a-service) related services

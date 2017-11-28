@@ -16,7 +16,7 @@ class TestNyuki(TestCase):
     def setUp(self):
         self.default = DEFAULT_CONF_FILE
         with open(self.default, 'w') as f:
-            f.write('{"bus": {"jid": "test@localhost", "password": "test"}}')
+            f.write('{"bus": {"name": "test"}}')
         kwargs = {'config': ''}
         self.nyuki = Nyuki(**kwargs)
 
@@ -28,37 +28,33 @@ class TestNyuki(TestCase):
 
     @ignore_loop
     def test_001_update_config(self):
-        assert_not_equal(self.nyuki.config['bus']['password'], 'new_password')
-        self.nyuki.update_config({
-            'bus': {
-                'password': 'new_password'
-            }
-        })
-        eq_(self.nyuki.config['bus']['password'], 'new_password')
+        assert_not_equal(self.nyuki.config['bus']['name'], 'new_name')
+        self.nyuki.update_config({'bus': {'name': 'new_name'}})
+        eq_(self.nyuki.config['bus']['name'], 'new_name')
 
         # Check read-only
         self.nyuki.save_config()
         with open(self.default, 'r') as f:
-            eq_(f.read(), '{"bus": {"jid": "test@localhost", "password": "test"}}')
+            eq_(f.read(), '{"bus": {"name": "test"}}')
 
     @ignore_loop
     def test_003_get_rest_configuration(self):
         response = self.apiconf.get(None)
         eq_(json.loads(bytes.decode(response.body)), self.nyuki._config)
 
-    @patch('nyuki.bus.XmppBus.stop')
+    @patch('nyuki.bus.MqttBus.stop')
     async def test_004_patch_rest_configuration(self, bus_stop_mock):
         req = Mock()
         async def json():
             return {
-                'bus': {'jid': 'updated@localhost'},
+                'bus': {'name': 'new_name'},
                 'new': True
             }
         req.headers = {'Content-Type': 'application/json'}
         req.json = json
         await self.apiconf.patch(req)
         eq_(self.nyuki._config['new'], True)
-        eq_(self.nyuki._config['bus']['jid'], 'updated@localhost')
+        eq_(self.nyuki._config['bus']['name'], 'new_name')
         # finish coroutines
         await exhaust_callbacks(self.loop)
         bus_stop_mock.assert_called_once_with()
@@ -111,7 +107,7 @@ class TestNyukiWithConfig(TestCase):
     def test_001_copy_default(self):
         # Default conf file
         with open(self.default, 'w') as f:
-            f.write('{"bus": {"jid": "test@localhost", "password": "test"}}')
+            f.write('{"bus": {"name": "test"}}')
 
         # Our conf file does not exist yet
         conf = os.path.join(self.dir.name, 'myconf.json')
@@ -121,13 +117,13 @@ class TestNyukiWithConfig(TestCase):
 
         # Check our conf is created from default
         with open(conf, 'r') as f:
-            eq_(f.read(), '{"bus": {"jid": "test@localhost", "password": "test"}}')
+            eq_(f.read(), '{"bus": {"name": "test"}}')
 
     @ignore_loop
     def test_002_bad_conf_file(self):
         conf = os.path.join(self.dir.name, 'myconf.json')
         with open(conf, 'w') as f:
-            f.write('{"bus": {"jid": "test@localhost", "password": "test"')
+            f.write('{"bus": {"name": "test"')
 
         with assert_raises(ValueError):
             kwargs = {'config': conf}

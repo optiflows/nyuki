@@ -30,7 +30,7 @@ class TestApi(TestCase):
 
     async def test_002_destroy_server(self):
         with patch.object(self._api, '_handler') as i_handler:
-            i_handler.finish_connections.return_value = make_future([])
+            i_handler.shutdown.return_value = make_future([])
             with patch.object(self._api, '_server') as i_server:
                 i_server.wait_closed.return_value = make_future([])
                 with patch.object(self._api._server, 'close') as call_close:

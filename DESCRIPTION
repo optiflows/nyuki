@@ -1,7 +1,7 @@
 A lightweight library designed to build nyukis (Python 3.4 only!). It provides features that shall help developers with managing the following topics while developing a nyuki:
 
 * Expose features through the own nyuki RESTful API
-* Communication between nyukis (over HTTP and XMPP)
+* Communication between nyukis (over HTTP and MQTT)
 * Helpers for asyncio-based programming
 
-This library has been written with a focus on reliability and developer-friendliness. Its design promotes single-threaded and asynchronous coding style through the extensive use of the [Python asyncio](https://docs.python.org/3/library/asyncio.html) event loop. A single loop is used to manage HTTP and XMPP-based communications as well as executing internal logic.
+This library has been written with a focus on reliability and developer-friendliness. Its design promotes single-threaded and asynchronous coding style through the extensive use of the [Python asyncio](https://docs.python.org/3/library/asyncio.html) event loop. A single loop is used to manage HTTP and MQTT-based communications as well as executing internal logic.

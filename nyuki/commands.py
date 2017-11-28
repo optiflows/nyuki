@@ -19,12 +19,8 @@ def _build_args():
         ])
     parser.add_argument('-c', '--config',
                         help='config file name', required=False)
-    parser.add_argument('-j', '--jid',
-                        help='xmpp jid: <user>[@<host>]', required=False)
-    parser.add_argument('-p', '--password',
-                        help='xmpp password', required=False)
     parser.add_argument('-s', '--server',
-                        help='xmpp server: <host>[:<port>]', required=False)
+                        help='bus host server: <host>[:<port>]', required=False)
     parser.add_argument('-a', '--api',
                         help='api binding: <host>[:<port>]', required=False)
     return parser.parse_args()
@@ -37,18 +33,7 @@ def get_command_kwargs():
         'api': {}
     }
 
-    if args.jid:
-        command_args['bus'] = {
-            **command_args.get('bus', {}),
-            'jid': args.jid,
-        }
-    if args.password:
-        command_args['bus'] = {
-            **command_args.get('bus', {}),
-            'password': args.password,
-        }
-
-    # Split XMPP host/port
+    # Split host/port
     if args.server:
         server = args.server.split(':')
         if len(server) == 1:

@@ -68,8 +68,7 @@ class TestGetFullConfig(TestCase):
         self.maxDiff = None
         fileconf = {
             'bus': {
-                'jid': 'test@localhost',
-                'password': 'test',
+                'name': 'test',
                 'host': '127.0.0.1',
                 'port': 5555
             }
@@ -77,8 +76,7 @@ class TestGetFullConfig(TestCase):
         read_conf_json.return_value = fileconf
         expected = {
             'bus': {
-                'jid': 'test@localhost',
-                'password': 'test',
+                'name': 'test',
                 'host': '127.0.0.1',
                 'port': 5555
             },
@@ -97,8 +95,7 @@ class TestGetFullConfig(TestCase):
         self.maxDiff = None
         fileconf = {
             'bus': {
-                'jid': 'test@localhost',
-                'password': 'test',
+                'name': 'test',
                 'host': '127.0.0.1',
                 'port': 5555
             }
@@ -109,8 +106,7 @@ class TestGetFullConfig(TestCase):
         debug_logging['root']['level'] = 'DEBUG'
         expected = {
             'bus': {
-                'jid': 'test@localhost',
-                'password': 'test',
+                'name': 'test',
                 'host': '127.0.0.1',
                 'port': 5555
             },
@@ -129,8 +125,7 @@ class TestNestedUpdate(TestCase):
     def setUp(self):
         self.defaults = {
             'bus': {
-                'jid': 'test@localhost',
-                'password': 'test',
+                'name': 'test',
                 'host': '127.0.0.1',
                 'port': 5555
             }
@@ -139,13 +134,12 @@ class TestNestedUpdate(TestCase):
     def test_001_update_defaults_dict_with_dict(self):
         updates = {
             'bus': {
-                'password': 'new_password'
+                'name': 'new_name'
             },
         }
         expected = {
             'bus': {
-                'jid': 'test@localhost',
-                'password': 'new_password',
+                'name': 'new_name',
                 'host': '127.0.0.1',
                 'port': 5555
             }
@@ -172,8 +166,7 @@ class TestNestedUpdate(TestCase):
         }
         expected = {
             'bus': {
-                'jid': 'test@localhost',
-                'password': 'test',
+                'name': 'test',
                 'host': '127.0.0.1',
                 'port': 5555
             },
