@@ -8,9 +8,9 @@ from jsonschema import validate
 from signal import SIGHUP, SIGINT, SIGTERM
 
 from .api import Api
-from .api.bus import ApiBusReplay, ApiBusTopics, ApiBusPublish
+from .api.bus import ApiBusTopics, ApiBusPublish
 from .api.config import ApiConfiguration, ApiSwagger
-from .bus import MqttBus, reporting
+from .bus import MqttBus
 from .commands import get_command_kwargs
 from .config import get_full_config, write_conf_json, merge_configs
 from .debugging import StackSampler, ApiSampleEmitter
@@ -51,7 +51,6 @@ class Nyuki:
     # API endpoints
     HTTP_RESOURCES = [
         ApiBusPublish,
-        ApiBusReplay,
         ApiBusTopics,
         ApiConfiguration,
         ApiSwagger,
@@ -132,32 +131,6 @@ class Nyuki:
     def config(self):
         return self._config
 
-    @property
-    def reporter(self):
-        """
-        Ensure backwards compatibility
-        TODO: must be removed
-        """
-        log.warning('Deprecated reporting call, use nyuki.bus.reporting')
-        return reporting
-
-    def _exception_handler(self, loop, context):
-        if 'exception' not in context:
-            log.warning('No exception in context: %s', context)
-            return
-        log.debug('Exception context: %s', context)
-
-        exc = Exception("could not retrieve exception's traceback")
-        if 'future' in context:
-            try:
-                context['future'].result()
-            except Exception as e:
-                exc = e
-        else:
-            exc = context['exception']
-
-        reporting.exception(exc)
-
     def start(self):
         """
         Start the nyuki
@@ -179,10 +152,6 @@ class Nyuki:
         except Exception as exc:
             log.error(exc)
             return
-
-        if 'bus' in self._services:
-            self.bus.init_reporting()
-            self.loop.set_exception_handler(self._exception_handler)
 
         # Call for setup
         if not asyncio.iscoroutinefunction(self.setup):

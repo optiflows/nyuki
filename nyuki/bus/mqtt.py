@@ -1,24 +1,24 @@
-import re
-import json
 import asyncio
+import json
 import logging
+import re
+from collections import namedtuple
 from copy import copy
 from uuid import uuid4
-from collections import namedtuple
+
 from hbmqtt.client import MQTTClient, ConnectException, ClientException
 from hbmqtt.errors import NoDataException
-from hbmqtt.mqtt.constants import QOS_1
-
-from nyuki.bus import reporting
+from hbmqtt.mqtt.constants import QOS_0, QOS_1, QOS_2
 from nyuki.services import Service
 from nyuki.utils import serialize_object
-from .persistence import BusPersistence, EventStatus
+from yarl import URL
 
 
 log = logging.getLogger(__name__)
 
 
-MQTTRegex = namedtuple('MQTTRegex', ['regex', 'callbacks'])
+MQTTSub = namedtuple('MQTTSub', ['topic', 'callbacks', 'qos'])
+MQTTSubRegex = namedtuple('MQTTSubRegex', ['regex', 'callbacks', 'qos'])
 
 
 class MqttBus(Service):
@@ -29,7 +29,6 @@ class MqttBus(Service):
             {nyuki_name}/publications
     """
 
-    SERVICE = 'mqtt'
     CONF_SCHEMA = {
         'type': 'object',
         'required': ['bus'],
@@ -37,29 +36,10 @@ class MqttBus(Service):
             'bus': {
                 'type': 'object',
                 'properties': {
+                    'dsn': {'type': 'string', 'minLength': 1},
                     'cafile': {'type': 'string', 'minLength': 1},
                     'certfile': {'type': 'string', 'minLength': 1},
-                    'host': {'type': 'string', 'minLength': 1},
                     'keyfile': {'type': 'string', 'minLength': 1},
-                    'name': {'type': 'string', 'minLength': 1},
-                    'port': {'type': 'integer'},
-                    'persistence': {
-                        'type': 'object',
-                        'required': ['backend'],
-                        'properties': {
-                            'backend': {'type': 'string', 'enum': [
-                                'memory',
-                                'mongo',
-                            ]},
-                            'host': {'type': 'string'},
-                            'ttl': {'type': 'number'},
-                        },
-                    },
-                    'scheme': {
-                        'type': 'string',
-                        'enum': ['ws', 'wss', 'mqtt', 'mqtts']
-                    },
-                    'service': {'type': 'string', 'minLength': 1},
                     'keep_alive': {'type': 'integer', 'minimum': 1},
                     'ping_delay': {'type': 'integer', 'minimum': 1}
                 },
@@ -72,10 +52,8 @@ class MqttBus(Service):
         self._nyuki = nyuki
         self._nyuki.register_schema(self.CONF_SCHEMA)
         self._loop = loop or asyncio.get_event_loop()
-        self._host = None
+        self._dsn = None
         self.client = None
-        self._pending = {}
-        self.name = None
         self._subscriptions = {}
         self._regex_subscriptions = {}
 
@@ -87,19 +65,22 @@ class MqttBus(Service):
     def topics(self):
         return list(self._subscriptions.keys())
 
-    def configure(self, name, scheme='mqtt', host='localhost', port=1883,
-                  cafile=None, certfile=None, keyfile=None, persistence={},
-                  service=None, keep_alive=60, ping_delay=5):
-        if scheme in ['mqtts', 'wss']:
+    @property
+    def name(self):
+        return self._dsn.user
+
+    def configure(self, dsn, cafile=None, certfile=None, keyfile=None,
+                  keep_alive=60, ping_delay=5):
+        self._dsn = URL(dsn)
+        if self._dsn.scheme in ['mqtts', 'wss']:
             if not cafile or not certfile or not keyfile:
                 raise ValueError(
                     "secured scheme requires 'cafile', 'certfile' and 'keyfile'"
                 )
 
-        self._host = '{}://{}:{}'.format(scheme, host, port)
-        self.name = name
         self._cafile = cafile
         self.client = MQTTClient(
+            client_id=self.name,
             config={
                 'auto_reconnect': False,
                 'certfile': certfile,
@@ -110,17 +91,7 @@ class MqttBus(Service):
             loop=self._loop
         )
 
-        # Persistence storage
-        if persistence:
-            self._persistence = BusPersistence(name=name, **persistence)
-            log.info('Bus persistence set to %s', self._persistence.backend)
-        else:
-            self._persistence = None
-
     async def start(self):
-        if self._persistence:
-            await self._persistence.init()
-
         def cancelled(future):
             try:
                 future.result()
@@ -147,12 +118,6 @@ class MqttBus(Service):
             self.listen_future.cancel()
         log.info('MQTT service stopped')
 
-    def init_reporting(self):
-        """
-        Initialize reporting module
-        """
-        reporting.init(self.name, self)
-
     def _regex_topic(self, topic):
         """
         Transform the MQTT pattern into a regex object.
@@ -160,29 +125,6 @@ class MqttBus(Service):
         return re.compile(r'^{}$'.format(
             topic.replace('+', '[^\/]+').replace('#', '.+')
         ))
-
-    async def replay(self, since=None, status=None):
-        """
-        Replay events since the given datetime (or all if None)
-        """
-        if not self._persistence:
-            return
-
-        msg = 'Replaying events'
-        if since:
-            msg += ' since {}'.format(since)
-        if status:
-            msg += ' with status {}'.format(status)
-        log.info(msg)
-
-        events = await self._persistence.retrieve(since, status)
-        for event in events:
-            # Publish events one by one in the right publish time order
-            await self.publish(json.loads(
-                event['message']),
-                event['topic'],
-                event['id']
-            )
 
     async def subscribe(self, topic, callback):
         """
@@ -200,7 +142,7 @@ class MqttBus(Service):
             try:
                 self._regex_subscriptions[topic].callbacks.add(callback)
             except KeyError:
-                self._regex_subscriptions[topic] = MQTTRegex(
+                self._regex_subscriptions[topic] = MQTTSubRegex(
                     regex=self._regex_topic(topic),
                     callbacks={callback},
                 )
@@ -215,7 +157,7 @@ class MqttBus(Service):
 
         # Send the subscription packet only if we were not subscribed yet
         if sub is True:
-            await self.client.subscribe([(topic, QOS_1)])
+            await self.client.subscribe([(topic, QOS_2)])
             log.info('Subscribed to %s', topic)
 
     async def _unsub_regex(self, topic, callback):
@@ -271,61 +213,51 @@ class MqttBus(Service):
             log.debug('Resubscribing to %s', topic)
             await self.client.subscribe([(topic, QOS_1)])
 
-    async def publish(self, data, topic=None, previous_uid=None):
+    async def publish_qos_0(self, data, topic):
+        return await self.publish(data, topic, qos=QOS_0)
+
+    async def publish_qos_1(self, data, topic):
+        return await self.publish(data, topic, qos=QOS_1)
+
+    async def publish_qos_2(self, data, topic):
+        return await self.publish(data, topic, qos=QOS_2)
+
+    async def publish(self, data, topic, qos=QOS_0):
         """
         Publish in given topic or default one
         """
-        uid = previous_uid or str(uuid4())
-        topic = topic or self.name
         log.debug("Publishing event to '%s': %s", topic, data)
         data = json.dumps(data, default=serialize_object)
 
         if self.client._connected_state.is_set():
             try:
-                await self.client.publish(topic, data.encode())
+                await self.client.publish(topic, data.encode(), qos=qos)
             except Exception as exc:
-                status = EventStatus.PENDING
                 log.error('Error while publishing: %s', exc)
             else:
-                status = EventStatus.SENT
                 log.debug('Event successfully sent to topic %s', topic)
         else:
-            status = EventStatus.FAILED
             log.error('Failed to send event to topic %s', topic)
-
-        if self._persistence:
-            if previous_uid is None:
-                # This event was not previously sent
-                await self._persistence.store({
-                    'id': uid,
-                    'status': status.value,
-                    'topic': topic,
-                    'message': data,
-                })
-            else:
-                await self._persistence.update(uid, status)
 
     async def _run(self):
         """
         Handle reconnection every 3 seconds
         """
         while True:
-            log.info('Trying MQTT connection to %s', self._host)
+            log.info('Trying MQTT connection to %s', self._dsn)
             try:
-                await self.client.connect(self._host, cafile=self._cafile)
+                await self.client.connect(
+                    str(self._dsn),
+                    cleansession=False,
+                    cafile=self._cafile,
+                )
             except (ConnectException, NoDataException) as exc:
                 log.error(exc)
                 log.info('Waiting 3 seconds to reconnect')
                 await asyncio.sleep(3.0)
                 continue
 
-            # Replaying events
             log.info('Connection made with MQTT')
-            if self._persistence:
-                asyncio.ensure_future(self.replay(
-                    status=EventStatus.not_sent()
-                ))
-
             # Start listening
             await self._resubscribe()
             self.listen_future = asyncio.ensure_future(self._listen())
@@ -342,6 +274,7 @@ class MqttBus(Service):
         while True:
             try:
                 message = await self.client.deliver_message()
+                log.critical(message.data)
             except ClientException as exc:
                 log.error(exc)
                 break

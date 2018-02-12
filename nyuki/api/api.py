@@ -5,7 +5,6 @@ from functools import partial
 import json
 import logging
 
-from nyuki.bus import reporting
 from nyuki.services import Service
 from nyuki.utils import serialize_object
 
@@ -117,9 +116,6 @@ async def mw_capability(app, capa_handler):
             raise
         except HTTPBreak as exc:
             return Response(exc.body, status=exc.status)
-        except Exception as exc:
-            reporting.exception(exc)
-            raise
 
         if capa_resp and isinstance(capa_resp, Response):
             return capa_resp

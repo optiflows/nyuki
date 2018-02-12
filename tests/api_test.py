@@ -124,21 +124,3 @@ class TestCapabilityMiddleware(TestCase):
         ar = await self._request.json()
         eq_(ar['capability'], 'test')
         eq_(self._request.headers.get('Content-Type'), 'application/json')
-
-    @patch('nyuki.bus.reporting.exception')
-    async def test_004_exception(self, exc_mock):
-        self._request.method = 'GET'
-        self._request.GET = {}
-        self._request.match_info = {}
-
-        exc = Exception('fail')
-        async def _capa_handler(d):
-            raise exc
-
-        mdw = await mw_capability(self._app, _capa_handler)
-        assert_is_not_none(mdw)
-
-        with assert_raises(Exception):
-            await mdw(self._request)
-
-        exc_mock.asser_called_once_with(exc)
