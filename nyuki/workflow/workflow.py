@@ -360,11 +360,9 @@ class WorkflowNyuki(Nyuki):
                 memjob = self.clear_report(instance_id)
             asyncio.ensure_future(memjob)
 
-        asyncio.ensure_future(self.bus.publish(
-            payload, 'websocket/{}'.format(topic)
-        ))
+        await self.bus.publish(payload, 'websocket/{}'.format(topic))
 
-    async def workflow_event(self, efrom, data):
+    async def workflow_event(self, topic, data):
         """
         New bus event received, trigger workflows if needed.
         """
@@ -372,13 +370,13 @@ class WorkflowNyuki(Nyuki):
         # Retrieve full workflow templates
         # TODO: Better way to fetch the full template details
         # (this does may more requests than it should)
-        wf_templates = await self.engine.selector.select(efrom)
+        wf_templates = await self.engine.selector.select(topic)
         for wftmpl in wf_templates:
             templates[wftmpl.uid] = await self.storage.get_template(
                 wftmpl.uid, draft=False
             )
         # Trigger workflows
-        instances = await self.engine.data_received(data, efrom)
+        instances = await self.engine.data_received(data, topic)
         for instance in instances:
             self.new_workflow(templates[instance.template.uid], instance)
 

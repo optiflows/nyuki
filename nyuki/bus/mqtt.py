@@ -16,18 +16,10 @@ from yarl import URL
 
 log = logging.getLogger(__name__)
 
-
-MQTTSub = namedtuple('MQTTSub', ['topic', 'callbacks', 'qos'])
-MQTTSubRegex = namedtuple('MQTTSubRegex', ['regex', 'callbacks', 'qos'])
+MQTTSubRegex = namedtuple('MQTTSubRegex', ['regex', 'callbacks'])
 
 
 class MqttBus(Service):
-
-    """
-    Nyuki topics formatted as:
-        - global publications:
-            {nyuki_name}/publications
-    """
 
     CONF_SCHEMA = {
         'type': 'object',
@@ -56,6 +48,7 @@ class MqttBus(Service):
         self.client = None
         self._subscriptions = {}
         self._regex_subscriptions = {}
+        self._persisted = {}
 
         # Coroutines
         self.connect_future = None
@@ -157,8 +150,14 @@ class MqttBus(Service):
 
         # Send the subscription packet only if we were not subscribed yet
         if sub is True:
-            await self.client.subscribe([(topic, QOS_2)])
+            await self.client.subscribe([(topic, QOS_1)])
             log.info('Subscribed to %s', topic)
+
+        # Look for persisted message received prior to this subscription.
+        if topic in self._persisted:
+            for data in self._persisted[topic]:
+                self._handle_message(topic, data)
+            del self._persisted[topic]
 
     async def _unsub_regex(self, topic, callback):
         """
@@ -207,10 +206,11 @@ class MqttBus(Service):
         """
         Resubscribe on reconnection.
         """
-        subs = list(self._subscriptions.keys()) + \
-            list(self._regex_subscriptions.keys())
+        # Resubscribe in case the MQTT broker restarted.
+        subs = [topic for topic in self._subscriptions.keys()]
+        subs.extend(self._regex_subscriptions.keys())
         for topic in subs:
-            log.debug('Resubscribing to %s', topic)
+            log.info('Resubscribing to %s', topic)
             await self.client.subscribe([(topic, QOS_1)])
 
     async def publish_qos_0(self, data, topic):
@@ -269,12 +269,12 @@ class MqttBus(Service):
 
     async def _listen(self):
         """
-        Listen to events after a successful connection
+        Listen to events after a successful connection.
         """
         while True:
             try:
                 message = await self.client.deliver_message()
-                log.critical(message.data)
+                log.critical('-> %s : %s', message.topic, message.data.decode())
             except ClientException as exc:
                 log.error(exc)
                 break
@@ -283,19 +283,28 @@ class MqttBus(Service):
                 log.info('listening loop ended')
                 break
 
-            topic = message.topic
-            data = json.loads(message.data.decode())
+            self._handle_message(
+                message.topic,
+                json.loads(message.data.decode()),
+            )
 
-            # Iterate and call all regex topics callbacks
-            for mqttregex in self._regex_subscriptions.values():
-                if mqttregex.regex.match(topic):
-                    log.debug("Event from topic '%s': %s", topic, data)
-                    for callback in mqttregex.callbacks:
-                        asyncio.ensure_future(callback(topic, data.copy()))
-
-            try:
-                # Iterate and call all single topic callbacks
-                for callback in self._subscriptions[topic]:
+    def _handle_message(self, topic, data):
+        handled = False
+        # Iterate and call all regex topics callbacks
+        for mqttregex in self._regex_subscriptions.values():
+            if mqttregex.regex.match(topic):
+                for callback in mqttregex.callbacks:
                     asyncio.ensure_future(callback(topic, data.copy()))
-            except KeyError:
-                pass
+                handled = True
+
+        # Iterate and call all single topic callbacks
+        if topic in self._subscriptions:
+            for callback in self._subscriptions[topic]:
+                asyncio.ensure_future(callback(topic, data.copy()))
+            handled = True
+
+        if handled is False:
+            if topic in self._persisted:
+                self._persisted[topic].append(data)
+            else:
+                self._persisted[topic] = [data]

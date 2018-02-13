@@ -25,7 +25,8 @@ class ApiBusPublish:
         except KeyError:
             return Response(status=404)
         request = await request.json()
-        asyncio.ensure_future(self.nyuki.bus.publish_qos_0(
+        asyncio.ensure_future(self.nyuki.bus.publish(
             request.get('data', {}),
             request.get('topic', 'testing'),
+            request.get('qos', 0),
         ))
