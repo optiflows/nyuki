@@ -258,14 +258,19 @@ class MqttBus(Service):
                 continue
 
             log.info('Connection made with MQTT')
-            # Start listening
+            # Start listening.
             await self._resubscribe()
             self.listen_future = asyncio.ensure_future(self._listen())
-            # Blocks until mqtt is disconnected
+            # Ensure the _persisted dict is emptied at some point.
+            self._loop.call_later(60, self._clear_persisted)
+            # Blocks until mqtt is disconnected.
             await self.client._handler.wait_disconnect()
-            # Clean listen_future
+            # Clean listen_future.
             self.listen_future.cancel()
             self.listen_future = None
+
+    def _clear_persisted(self):
+        self._persisted = {}
 
     async def _listen(self):
         """
@@ -303,6 +308,9 @@ class MqttBus(Service):
                 asyncio.ensure_future(callback(topic, data.copy()))
             handled = True
 
+        # If the message was not linked to any known topic, keep it
+        # in memory for a later subscription (should happen in an instant).
+        # The dict is cleared 60 seconds after the connection.
         if handled is False:
             if topic in self._persisted:
                 self._persisted[topic].append(data)
