@@ -29,7 +29,7 @@ from .api.instances import (
     ApiWorkflow, ApiWorkflows, ApiWorkflowsHistory, ApiWorkflowHistory,
     ApiWorkflowTriggers, ApiWorkflowTrigger, ApiWorkflowHistoryTask,
     ApiWorkflowHistoryTaskData, ApiTaskReporting, ApiTaskReportingContact,
-    ApiTaskReportingContacts,
+    ApiTaskReportingContacts, ApiWorkflowHistoryCSV
 )
 from .api.vars import (
     ApiVars, ApiVarsVersion, ApiVarsDraft
@@ -182,30 +182,31 @@ class WorkflowNyuki(Nyuki):
         }
     }
     HTTP_RESOURCES = Nyuki.HTTP_RESOURCES + [
-        ApiTasks,  # /v1/workflows/tasks
-        ApiTemplates,  # /v1/workflows/templates
-        ApiTemplate,  # /v1/workflows/templates/{uid}
-        ApiTemplateDraft,  # /v1/workflows/templates/{uid}/draft
-        ApiTemplateVersion,  # /v1/workflows/templates/{uid}/{version}
-        ApiWorkflows,  # /v1/workflow/instances
-        ApiWorkflow,  # /v1/workflow/instances/{uid}
-        ApiTaskReporting,  # /v1/workflow/instances/{uid}/tasks/{task_id}/reporting
-        ApiTaskReportingContacts,  # /v1/workflow/instances/{uid}/tasks/{task_id}/reporting/contacts
-        ApiTaskReportingContact,  # /v1/workflow/instances/{uid}/tasks/{task_id}/reporting/contacts/{contact_id}
-        ApiWorkflowsHistory,  # /v1/workflows/history
-        ApiWorkflowHistory,  # /v1/workflows/history/{uid}
-        ApiWorkflowHistoryTask,  # /v1/workflows/history/{uid}/tasks/{task_id}
-        ApiWorkflowHistoryTaskData,  # /v1/workflows/history/{uid}/tasks/{task_id}/data
-        ApiFactoryRegexes,  # /v1/workflows/regexes
-        ApiFactoryRegex,  # /v1/workflows/regexes/{uid}
-        ApiFactoryLookups,  # /v1/workflows/lookups
-        ApiFactoryLookup,  # /v1/workflows/lookups/{uid}
-        ApiFactoryLookupCSV,  # /v1/workflows/lookups/{uid}/csv
-        ApiWorkflowTriggers,  # /v1/workflows/triggers
-        ApiWorkflowTrigger,  # /v1/workflows/triggers/{tid},
-        ApiVars,  # /v1/workflows/vars/{uid}
-        ApiVarsVersion,  # /v1/workflows/vars/{uid}/{version}
-        ApiVarsDraft  # /v1/workflows/data/{uid}/draft
+        ApiTasks,                   # /v1/workflow/tasks
+        ApiTemplates,               # /v1/workflow/templates
+        ApiTemplate,                # /v1/workflow/templates/{uid}
+        ApiTemplateDraft,           # /v1/workflow/templates/{uid}/draft
+        ApiTemplateVersion,         # /v1/workflow/templates/{uid}/{version}
+        ApiWorkflows,               # /v1/workflow/instances
+        ApiWorkflow,                # /v1/workflow/instances/{uid}
+        ApiTaskReporting,           # /v1/workflow/instances/{uid}/tasks/{task_id}/reporting
+        ApiTaskReportingContacts,   # /v1/workflow/instances/{uid}/tasks/{task_id}/reporting/contacts
+        ApiTaskReportingContact,    # /v1/workflow/instances/{uid}/tasks/{task_id}/reporting/contacts/{contact_id}
+        ApiWorkflowsHistory,        # /v1/workflow/history
+        ApiWorkflowHistory,         # /v1/workflow/history/{uid}
+        ApiWorkflowHistoryCSV,      # /v1/workflow/history/{uid}/csv
+        ApiWorkflowHistoryTask,     # /v1/workflow/history/{uid}/tasks/{task_id}
+        ApiWorkflowHistoryTaskData, # /v1/workflow/history/{uid}/tasks/{task_id}/data
+        ApiFactoryRegexes,          # /v1/workflow/regexes
+        ApiFactoryRegex,            # /v1/workflow/regexes/{uid}
+        ApiFactoryLookups,          # /v1/workflow/lookups
+        ApiFactoryLookup,           # /v1/workflow/lookups/{uid}
+        ApiFactoryLookupCSV,        # /v1/workflow/lookups/{uid}/csv
+        ApiWorkflowTriggers,        # /v1/workflow/triggers
+        ApiWorkflowTrigger,         # /v1/workflow/triggers/{tid},
+        ApiVars,                    # /v1/workflow/vars/{uid}
+        ApiVarsVersion,             # /v1/workflow/vars/{uid}/{version}
+        ApiVarsDraft,               # /v1/workflow/data/{uid}/draft
     ]
 
     DEFAULT_POLICY = None

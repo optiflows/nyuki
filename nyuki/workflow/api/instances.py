@@ -365,6 +365,17 @@ class ApiWorkflowHistory:
         return Response(workflow)
 
 
+@resource('/workflow/history/{uid}/csv', versions=['v1'])
+class ApiWorkflowHistoryCSV:
+
+    async def get(self, request, uid):
+        csv = await self.nyuki.storage.get_workflow_csv(uid)
+        if csv is None:
+            # If nothing to report, return 404
+            return Response(status=404)
+        return Response(csv, headers={'Content-Type': 'text/csv'})
+
+
 @resource('/workflow/history/{uid}/tasks/{task_id}', versions=['v1'])
 class ApiWorkflowHistoryTask:
 

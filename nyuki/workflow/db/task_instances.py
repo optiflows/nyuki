@@ -58,6 +58,23 @@ class TaskInstancesCollection:
             filters.update({'inputs': 0, 'outputs': 0})
         return await self._instances.find_one({'id': tid}, filters)
 
+    def get_for_csv(self, workflow_id):
+        """
+        Return the data needed for a CSV import of one workflow execution.
+        To be used with `async for task in get_for_csv():`
+        """
+        return self._instances.find({
+            'workflow_instance_id': workflow_id,
+            'template.name': {'$in': ['send_sms', 'call', 'send_email', 'wait_sms', 'wait_call', 'wait_email']},
+            'reporting': {'$ne': None},
+        }, {
+            'start': 1,
+            'template.id': 1,
+            'template.title': 1,
+            'template.name': 1,
+            'reporting.contacts': 1,
+        })
+
     async def get_data(self, tid):
         """
         Return the data (inputs/outputs) of one executed task.

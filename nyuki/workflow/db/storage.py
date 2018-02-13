@@ -1,5 +1,8 @@
+import csv
 import logging
 from copy import deepcopy
+from datetime import datetime
+from io import StringIO
 
 from motor.motor_asyncio import AsyncIOMotorClient
 from pymongo.errors import ServerSelectionTimeoutError
@@ -227,3 +230,90 @@ class MongoStorage:
 
     async def get_instance_task_data(self, task_id):
         return await self._task_instances.get_data(task_id)
+
+    async def get_workflow_csv(self, workflow_id):
+        """
+        Generate and returns a CSV string of one workflow execution report.
+        """
+        task_found = False
+        csvfile = StringIO()
+        writer = csv.DictWriter(csvfile, [
+            'task_id', 'task_title', 'contact_name', 'direction',
+            'media_type', 'media_address', 'start', 'end', 'result',
+        ])
+        writer.writeheader()
+        async for task in self._task_instances.get_for_csv(workflow_id):
+            task_found = True
+            task_id = task['template']['id']
+            task_title = task['template']['title']
+            task_name = task['template']['name']
+            for contact in task['reporting']['contacts']:
+                row = {
+                    'task_id': task_id,
+                    'task_title': task_title,
+                    'contact_name': contact['display_name'],
+                    'media_type': '',
+                    'media_address': '',
+                    'direction': '',
+                    'start': '',
+                    'end': '',
+                    'result': '',
+                }
+
+                # Send SMS.
+                if task_name == 'send_sms':
+                    row['media_type'] = 'mobile'
+                    row['media_address'] = contact['mobile']
+                    row['direction'] = 'outbound'
+                    row['start'] = task['start'].isoformat()
+                    row['end'] = task['start'].isoformat()
+                    row['result'] = contact['state']
+                    writer.writerow(row)
+
+                # Send email.
+                elif task_name == 'send_email':
+                    row['media_type'] = 'email'
+                    row['media_address'] = contact['email']
+                    row['direction'] = 'outbound'
+                    row['start'] = task['start'].isoformat()
+                    row['end'] = task['start'].isoformat()
+                    row['result'] = contact['state']
+                    writer.writerow(row)
+
+                # Call.
+                elif task_name == 'call':
+                    row['direction'] = 'outbound'
+                    if not contact['feedback']:
+                        continue
+                    row['result'] = contact['feedback']
+                    for call in contact['calls']:
+                        if row['result'] != call['feedback']:
+                            continue
+                        row['media_type'] = call['media']
+                        row['media_address'] = call['number']
+                        if call['start']:
+                            row['start'] = call['start'].isoformat()
+                        if call['end']:
+                            row['end'] = call['end'].isoformat()
+                        writer.writerow(row)
+                        break
+
+                # Wait input.
+                elif task_name.startswith('wait_'):
+                    row['direction'] = 'inbound'
+                    row['media_address'] = contact['source']
+                    row['start'] = task['start'].isoformat()
+                    if contact['received_at']:
+                        row['end'] = contact['received_at'].isoformat()
+                    row['result'] = contact['input']
+                    if task_name == 'wait_sms':
+                        row['media_type'] = 'mobile'
+                    if task_name == 'wait_email':
+                        row['media_type'] = 'email'
+                    if task_name == 'wait_call':
+                        row['media_type'] = 'phone'
+                    writer.writerow(row)
+
+        if task_found is False:
+            return None
+        return csvfile.getvalue()
