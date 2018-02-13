@@ -56,14 +56,9 @@ class Response(web.Response):
 
         # Check json
         if isinstance(body, dict) or isinstance(body, list):
-            body = json.dumps(body, default=serialize_object).encode(self.ENCODING)
+            body = json.dumps(body, default=serialize_object).encode()
             if not self._get_content_type(kwargs):
                 kwargs['content_type'] = 'application/json'
-        # Check body
-        elif body is not None:
-            body = str(body).encode(self.ENCODING)
-            if not self._get_content_type(kwargs):
-                kwargs['content_type'] = 'text/plain'
 
         return super().__init__(body=body, **kwargs)
 

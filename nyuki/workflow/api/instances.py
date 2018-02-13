@@ -369,11 +369,18 @@ class ApiWorkflowHistory:
 class ApiWorkflowHistoryCSV:
 
     async def get(self, request, uid):
-        csv = await self.nyuki.storage.get_workflow_csv(uid)
+        timezone = request.GET.get('timezone', 'utc')
+        csv = await self.nyuki.storage.get_workflow_csv(uid, timezone)
         if csv is None:
             # If nothing to report, return 404
             return Response(status=404)
-        return Response(csv, headers={'Content-Type': 'text/csv'})
+        return Response(
+            csv,
+            headers={
+                'Content-Disposition': f'attachment; filename=workflow-{uid[:8]}.csv',
+                'Content-Type': 'text/csv; charset=latin-1',
+            },
+        )
 
 
 @resource('/workflow/history/{uid}/tasks/{task_id}', versions=['v1'])

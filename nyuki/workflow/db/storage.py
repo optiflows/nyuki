@@ -1,5 +1,6 @@
 import csv
 import logging
+import pytz
 from copy import deepcopy
 from datetime import datetime
 from io import StringIO
@@ -17,6 +18,14 @@ from .task_instances import TaskInstancesCollection
 
 
 log = logging.getLogger(__name__)
+
+
+class WorkflowExcel(csv.excel):
+
+    delimiter = ';'
+
+
+csv.register_dialect('workflow-excel', WorkflowExcel)
 
 
 class MongoStorage:
@@ -231,22 +240,24 @@ class MongoStorage:
     async def get_instance_task_data(self, task_id):
         return await self._task_instances.get_data(task_id)
 
-    async def get_workflow_csv(self, workflow_id):
+    async def get_workflow_csv(self, workflow_id, timezone='utc'):
         """
         Generate and returns a CSV string of one workflow execution report.
         """
         task_found = False
+        timezone = pytz.timezone(timezone)
         csvfile = StringIO()
         writer = csv.DictWriter(csvfile, [
             'task_id', 'task_title', 'contact_name', 'direction',
             'media_type', 'media_address', 'start', 'end', 'result',
-        ])
+        ], dialect='workflow-excel')
         writer.writeheader()
         async for task in self._task_instances.get_for_csv(workflow_id):
             task_found = True
             task_id = task['template']['id']
             task_title = task['template']['title']
             task_name = task['template']['name']
+            start = task['start'].astimezone(timezone).isoformat()
             for contact in task['reporting']['contacts']:
                 row = {
                     'task_id': task_id,
@@ -255,8 +266,8 @@ class MongoStorage:
                     'media_type': '',
                     'media_address': '',
                     'direction': '',
-                    'start': '',
-                    'end': '',
+                    'start': start,
+                    'end': start,
                     'result': '',
                 }
 
@@ -265,8 +276,6 @@ class MongoStorage:
                     row['media_type'] = 'mobile'
                     row['media_address'] = contact['mobile']
                     row['direction'] = 'outbound'
-                    row['start'] = task['start'].isoformat()
-                    row['end'] = task['start'].isoformat()
                     row['result'] = contact['state']
                     writer.writerow(row)
 
@@ -275,8 +284,6 @@ class MongoStorage:
                     row['media_type'] = 'email'
                     row['media_address'] = contact['email']
                     row['direction'] = 'outbound'
-                    row['start'] = task['start'].isoformat()
-                    row['end'] = task['start'].isoformat()
                     row['result'] = contact['state']
                     writer.writerow(row)
 
@@ -292,9 +299,9 @@ class MongoStorage:
                         row['media_type'] = call['media']
                         row['media_address'] = call['number']
                         if call['start']:
-                            row['start'] = call['start'].isoformat()
+                            row['start'] = call['start'].astimezone(timezone).isoformat()
                         if call['end']:
-                            row['end'] = call['end'].isoformat()
+                            row['end'] = call['end'].astimezone(timezone).isoformat()
                         writer.writerow(row)
                         break
 
@@ -302,9 +309,8 @@ class MongoStorage:
                 elif task_name.startswith('wait_'):
                     row['direction'] = 'inbound'
                     row['media_address'] = contact['source']
-                    row['start'] = task['start'].isoformat()
                     if contact['received_at']:
-                        row['end'] = contact['received_at'].isoformat()
+                        row['end'] = contact['received_at'].astimezone(timezone).isoformat()
                     row['result'] = contact['input']
                     if task_name == 'wait_sms':
                         row['media_type'] = 'mobile'
@@ -316,4 +322,4 @@ class MongoStorage:
 
         if task_found is False:
             return None
-        return csvfile.getvalue()
+        return csvfile.getvalue().encode('latin-1')
