@@ -18,19 +18,14 @@ class TestResourceDecorator(TestCase):
 
 class TestResponse(TestCase):
 
-    def test_001_dict_body(self):
+    def test_001_json_body(self):
         response = Response({'test': 'test'})
         eq_(response.body, b'{"test": "test"}')
         eq_(response.content_type, 'application/json')
 
-    def test_002_other_body(self):
-        response = Response(123)
-        eq_(response.body, b'123')
-        eq_(response.content_type, 'text/plain')
-
-        response = Response('hello')
-        eq_(response.body, b'hello')
-        eq_(response.content_type, 'text/plain')
+        response = Response(['test', 'test2'])
+        eq_(response.body, b'["test", "test2"]')
+        eq_(response.content_type, 'application/json')
 
 
 class TestResourceClass(TestCase):
