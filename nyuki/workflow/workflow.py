@@ -29,7 +29,7 @@ from .api.instances import (
     ApiWorkflow, ApiWorkflows, ApiWorkflowsHistory, ApiWorkflowHistory,
     ApiWorkflowTriggers, ApiWorkflowTrigger, ApiWorkflowHistoryTask,
     ApiWorkflowHistoryTaskData, ApiTaskReporting, ApiTaskReportingContact,
-    ApiTaskReportingContacts, ApiWorkflowHistoryCSV
+    ApiTaskReportingContacts
 )
 from .api.vars import (
     ApiVars, ApiVarsVersion, ApiVarsDraft
@@ -194,7 +194,6 @@ class WorkflowNyuki(Nyuki):
         ApiTaskReportingContact,    # /v1/workflow/instances/{uid}/tasks/{task_id}/reporting/contacts/{contact_id}
         ApiWorkflowsHistory,        # /v1/workflow/history
         ApiWorkflowHistory,         # /v1/workflow/history/{uid}
-        ApiWorkflowHistoryCSV,      # /v1/workflow/history/{uid}/csv
         ApiWorkflowHistoryTask,     # /v1/workflow/history/{uid}/tasks/{task_id}
         ApiWorkflowHistoryTaskData, # /v1/workflow/history/{uid}/tasks/{task_id}/data
         ApiFactoryRegexes,          # /v1/workflow/regexes

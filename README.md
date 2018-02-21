@@ -25,7 +25,7 @@ Here is a list of core concepts tied to a nyuki:
 * A nyuki is connected to a bus for 1-to-many communication with other nyukis (currently using MQTT)
 
 ## Requirements
-All you need is a Python interpreter. At the moment, only **Python 3.5** is supported.
+All you need is a Python interpreter. At the moment, only **Python 3.6** is supported.
 
 ## Getting started
 
