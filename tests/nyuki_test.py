@@ -16,7 +16,7 @@ class TestNyuki(TestCase):
     def setUp(self):
         self.default = DEFAULT_CONF_FILE
         with open(self.default, 'w') as f:
-            f.write('{"bus": {"name": "test"}}')
+            f.write('{"bus": {"dsn": "mqtt://test@localhost"}}')
         kwargs = {'config': ''}
         self.nyuki = Nyuki(**kwargs)
 
@@ -28,14 +28,14 @@ class TestNyuki(TestCase):
 
     @ignore_loop
     def test_001_update_config(self):
-        assert_not_equal(self.nyuki.config['bus']['name'], 'new_name')
-        self.nyuki.update_config({'bus': {'name': 'new_name'}})
-        eq_(self.nyuki.config['bus']['name'], 'new_name')
+        assert_not_equal(self.nyuki.config['bus']['dsn'], 'mqtt://new@localhost')
+        self.nyuki.update_config({'bus': {'dsn': 'mqtt://new@localhost'}})
+        eq_(self.nyuki.config['bus']['dsn'], 'mqtt://new@localhost')
 
         # Check read-only
         self.nyuki.save_config()
         with open(self.default, 'r') as f:
-            eq_(f.read(), '{"bus": {"name": "test"}}')
+            eq_(f.read(), '{"bus": {"dsn": "mqtt://test@localhost"}}')
 
     @ignore_loop
     def test_003_get_rest_configuration(self):
@@ -47,14 +47,14 @@ class TestNyuki(TestCase):
         req = Mock()
         async def json():
             return {
-                'bus': {'name': 'new_name'},
+                'bus': {'dsn': 'mqtt://new@localhost'},
                 'new': True
             }
         req.headers = {'Content-Type': 'application/json'}
         req.json = json
         await self.apiconf.patch(req)
         eq_(self.nyuki._config['new'], True)
-        eq_(self.nyuki._config['bus']['name'], 'new_name')
+        eq_(self.nyuki._config['bus']['dsn'], 'mqtt://new@localhost')
         # finish coroutines
         await exhaust_callbacks(self.loop)
         bus_stop_mock.assert_called_once_with()
@@ -107,7 +107,7 @@ class TestNyukiWithConfig(TestCase):
     def test_001_copy_default(self):
         # Default conf file
         with open(self.default, 'w') as f:
-            f.write('{"bus": {"name": "test"}}')
+            f.write('{"bus": {"dsn": "mqtt://test@localhost"}}')
 
         # Our conf file does not exist yet
         conf = os.path.join(self.dir.name, 'myconf.json')
@@ -117,7 +117,7 @@ class TestNyukiWithConfig(TestCase):
 
         # Check our conf is created from default
         with open(conf, 'r') as f:
-            eq_(f.read(), '{"bus": {"name": "test"}}')
+            eq_(f.read(), '{"bus": {"dsn": "mqtt://test@localhost"}}')
 
     @ignore_loop
     def test_002_bad_conf_file(self):
