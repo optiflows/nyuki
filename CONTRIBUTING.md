@@ -64,18 +64,10 @@ Nyuki follows the classic GitHub's zen "fork-branch-PR" regarding patch submissi
 
 3. Work on the bug resolution or new feature implementation
 
-    We recommend creating a [virtualenv](https://pypi.python.org/pypi/virtualenv) beforehand when hacking on Nyuki:
+    Start by creating a working development environment with [Pipenv](https://docs.pipenv.org/) and [Make](https://www.gnu.org/software/make/)
 
     ```bash
-    surycat$ virtualenv ~/projects/nyuki
-    surycat$ source ~/projects/nyuki/bin/activate
-    ```
-
-    Then installing the library using the "[editable install](https://pip.pypa.io/en/stable/reference/pip_install/#editable-installs)" feature of `pip`:
-
-    ```bash
-    (nyuki) surycat$ git clone git@github.com:optiflows/nyuki.git ~/sources/nyuki
-    (nyuki) surycat$ pip install -e ~/sources/nyuki
+    surycat$ make dev
     ```
 
     To maintain a coherent coding style, any new code must be as [PEP 8](https://www.python.org/dev/peps/pep-0008/) compliant as possible.
@@ -84,7 +76,7 @@ Nyuki follows the classic GitHub's zen "fork-branch-PR" regarding patch submissi
 
     All existing tests must pass in order for a PR to be merged. If your PR implements a new feature, please write new unit tests.
 
-    Unit tests are using [nose](https://nose.readthedocs.org/en/latest/) and can be launched by invoking `nosetests` inside a properly set up virtualenv.
+    Unit tests are using [nose](https://nose.readthedocs.org/en/latest/) and can be launched by invoking `make test` inside a properly set up virtualenv.
 
 5. Tidy up your commits
 

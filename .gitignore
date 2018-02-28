@@ -49,3 +49,7 @@ coverage.xml
 
 *.sublime-project
 *.sublime-workspace
+
+# Requirements file (as we're using Pipenv)
+requirements.txt
+requirements_test.txt

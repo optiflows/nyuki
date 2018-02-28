@@ -15,7 +15,7 @@ jobs:
             echo 'export PATH=$PATH:$HOME/.local/bin' >> $BASH_ENV
       - run:
           name: Installing all dependencies (including dev ones)
-          command: pipenv install --dev
+          command: make dev
       - run:
           name: Running tests
           command: |
