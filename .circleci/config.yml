@@ -30,7 +30,7 @@ jobs:
       - run:
           name: Installing Twine
           command: |
-            pip install --user twine
+            pip install --user twine pipenv
             echo 'export PATH=$PATH:$HOME/.local/bin' >> $BASH_ENV
       - run:
           name: Deploying to Pypi
