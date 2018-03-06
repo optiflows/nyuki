@@ -46,10 +46,8 @@ class HTTPBreak(Exception):
 class Response(web.Response):
 
     """
-    Overrides aiohttp's response to facilitate its usage
+    Overrides aiohttp's response to facilitate its usage.
     """
-
-    ENCODING = 'utf-8'
 
     def __init__(self, body=None, **kwargs):
 
@@ -117,7 +115,7 @@ async def mw_capability(app, capa_handler):
         except HTTPBreak as exc:
             return Response(exc.body, status=exc.status)
 
-        if capa_resp and isinstance(capa_resp, Response):
+        if isinstance(capa_resp, Response):
             return capa_resp
         return Response()
 
@@ -210,9 +208,7 @@ class Api(Service):
         for resource in self._nyuki.HTTP_RESOURCES:
             resource.RESOURCE_CLASS.register(self._nyuki, self._app.router)
         log.info("Starting the http server on {}:{}".format(self._host, self._port))
-        self._handler = self._app.make_handler(
-            access_log=access_log,
-        )
+        self._handler = self._app.make_handler(access_log=access_log)
         self._server = await self._loop.create_server(
             self._handler, host=self._host, port=self._port
         )
