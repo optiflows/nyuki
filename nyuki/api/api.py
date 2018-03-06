@@ -187,7 +187,6 @@ class Api(Service):
         self._host = None
         self._port = None
         self._middlewares = [mw_capability]
-        self._debug = False
         self._app = None
         self._handler = None
         self._server = None
@@ -196,10 +195,9 @@ class Api(Service):
     def capabilities(self):
         return self._nyuki.HTTP_RESOURCES
 
-    def configure(self, host='0.0.0.0', port=5558, debug=False):
+    def configure(self, host='0.0.0.0', port=5558):
         self._host = host
         self._port = port
-        self._debug = bool(debug)
 
     async def start(self):
         """
@@ -213,7 +211,7 @@ class Api(Service):
             resource.RESOURCE_CLASS.register(self._nyuki, self._app.router)
         log.info("Starting the http server on {}:{}".format(self._host, self._port))
         self._handler = self._app.make_handler(
-            log=log, access_log=access_log, debug=self._debug
+            access_log=access_log,
         )
         self._server = await self._loop.create_server(
             self._handler, host=self._host, port=self._port
