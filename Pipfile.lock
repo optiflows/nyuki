@@ -89,10 +89,9 @@
         },
         "hbmqtt": {
             "hashes": [
-                "sha256:3d730429f1d6f9fc10ffceea1b516bb38e9c90b97fd30c31672f39823cc39812",
-                "sha256:b3b786ea3c50a2b1da6a05d56bccc910626cf607071eeaf1360648e2e0bf4b0b"
+                "sha256:380a42018df78c480488659183341c369ae3cd0375914f77f979250bcacb21ae"
             ],
-            "version": "==0.9.1"
+            "version": "==0.9.2"
         },
         "hiredis": {
             "hashes": [
@@ -109,9 +108,9 @@
         },
         "idna-ssl": {
             "hashes": [
-                "sha256:1227e44039bd31e02adaeafdbba61281596d623d222643fb021f87f2144ea147"
+                "sha256:1293f030bc608e9aa9cdee72aa93c1521bbb9c7698068c61c9ada6772162b979"
             ],
-            "version": "==1.0.0"
+            "version": "==1.0.1"
         },
         "jsonschema": {
             "hashes": [
@@ -420,10 +419,9 @@
         },
         "hbmqtt": {
             "hashes": [
-                "sha256:3d730429f1d6f9fc10ffceea1b516bb38e9c90b97fd30c31672f39823cc39812",
-                "sha256:b3b786ea3c50a2b1da6a05d56bccc910626cf607071eeaf1360648e2e0bf4b0b"
+                "sha256:380a42018df78c480488659183341c369ae3cd0375914f77f979250bcacb21ae"
             ],
-            "version": "==0.9.1"
+            "version": "==0.9.2"
         },
         "hiredis": {
             "hashes": [
@@ -440,9 +438,9 @@
         },
         "idna-ssl": {
             "hashes": [
-                "sha256:1227e44039bd31e02adaeafdbba61281596d623d222643fb021f87f2144ea147"
+                "sha256:1293f030bc608e9aa9cdee72aa93c1521bbb9c7698068c61c9ada6772162b979"
             ],
-            "version": "==1.0.0"
+            "version": "==1.0.1"
         },
         "jsonschema": {
             "hashes": [

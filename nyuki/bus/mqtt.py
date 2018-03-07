@@ -222,10 +222,13 @@ class MqttBus(Service):
     async def publish_qos_2(self, data, topic):
         return await self.publish(data, topic, qos=QOS_2)
 
-    async def publish(self, data, topic, qos=QOS_0):
+    async def publish(self, data, topic=None, qos=QOS_0):
         """
         Publish in given topic or default one
         """
+        if not topic:
+            topic = self.name
+
         log.debug("Publishing event to '%s': %s", topic, data)
         data = json.dumps(data, default=serialize_object)
 
@@ -279,7 +282,6 @@ class MqttBus(Service):
         while True:
             try:
                 message = await self.client.deliver_message()
-                log.critical('-> %s : %s', message.topic, message.data.decode())
             except ClientException as exc:
                 log.error(exc)
                 break
