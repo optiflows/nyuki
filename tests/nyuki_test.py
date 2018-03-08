@@ -61,16 +61,18 @@ class TestNyuki(TestCase):
 
     @ignore_loop
     def test_005a_custom_schema_fail(self):
-        with assert_raises(ValidationError):
-            self.nyuki.register_schema({
-                'type': 'object',
-                'required': ['port'],
-                'properties': {
-                    'port': {
-                        'type': 'integer',
-                    }
+        self.nyuki._validate_config()
+        self.nyuki.register_schema({
+            'type': 'object',
+            'required': ['port'],
+            'properties': {
+                'port': {
+                    'type': 'integer',
                 }
-            })
+            }
+        })
+        with assert_raises(ValidationError):
+            self.nyuki._validate_config()
 
     @ignore_loop
     def test_005b_custom_schema_ok(self):

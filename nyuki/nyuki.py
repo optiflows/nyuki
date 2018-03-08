@@ -136,6 +136,7 @@ class Nyuki:
         Start the nyuki
         The nyuki process is terminated when this method is finished
         """
+        self._validate_config()
         self.loop.add_signal_handler(SIGTERM, self.abort, SIGTERM)
         self.loop.add_signal_handler(SIGINT, self.abort, SIGINT)
         self.loop.add_signal_handler(SIGHUP, self.hang_up, SIGHUP)
@@ -219,7 +220,6 @@ class Nyuki:
         Add a jsonschema to validate on configuration update.
         """
         self._schemas.append((schema, format_checker))
-        self._validate_config()
 
     def _validate_config(self, config=None):
         """
