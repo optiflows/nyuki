@@ -4,11 +4,8 @@
 		"port": 8080
 	},
 	"bus": {
-		"service": "mqtt",
-		"scheme": "ws",
-		"host": "localhost",
-		"port": 1883,
-		"name": "timon"
+		"dsn": "mqtt://timon@localhost:1883",
+		"keep_alive": 10
 	},
 	"version": 0
 }
