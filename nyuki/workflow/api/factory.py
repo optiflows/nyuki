@@ -331,7 +331,7 @@ class ApiFactoryLookupCSV:
         filename = '{}.csv'.format(lookup['title'])
         filename = re.sub(r'[ ,]', '_', filename)
 
-        encoding = request.GET.get('encoding', 'UTF-8')
+        encoding = request.query.get('encoding', 'UTF-8')
 
         # Write CSV
         with StringIO() as iocsv:

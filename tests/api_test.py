@@ -70,7 +70,7 @@ class TestCapabilityMiddleware(TestCase):
 
     async def test_001b_extract_data_from_non_post_method(self):
         self._request.method = 'GET'
-        self._request.GET = {'id': 2}
+        self._request.query = {'id': 2}
         self._request.match_info = {'name': 'test'}
 
         async def _capa_handler(d, name):
@@ -103,7 +103,7 @@ class TestCapabilityMiddleware(TestCase):
 
     async def test_002_no_response(self):
         self._request.method = 'GET'
-        self._request.GET = {}
+        self._request.query = {}
         self._request.match_info = {}
 
         async def _capa_handler(d):

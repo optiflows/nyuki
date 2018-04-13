@@ -52,8 +52,8 @@ class ApiWorkflows(_WorkflowResource):
         Return workflow instances
         """
         workflows = []
-        children = request.GET.get('children', '0') == '1'
-        tasks = request.GET.get('tasks', '0') == '1'
+        children = request.query.get('children', '0') == '1'
+        tasks = request.query.get('tasks', '0') == '1'
 
         for wflow in self.nyuki.running_workflows.values():
             if children is False:
@@ -291,7 +291,7 @@ class ApiWorkflowsHistory:
             * `search` search templates with specific title
         """
         # Filter on start date
-        since = request.GET.get('since')
+        since = request.query.get('since')
         if since:
             try:
                 since = from_isoformat(since)
@@ -300,7 +300,7 @@ class ApiWorkflowsHistory:
                     'error': "Could not parse date '{}'".format(since)
                 })
         # Filter on state value
-        state = request.GET.get('state')
+        state = request.query.get('state')
         if state:
             try:
                 state = FutureState(state)
@@ -309,7 +309,7 @@ class ApiWorkflowsHistory:
                     'error': "Unknown state '{}'".format(state)
                 })
         # Skip first items
-        offset = request.GET.get('offset')
+        offset = request.query.get('offset')
         if offset:
             try:
                 offset = int(offset)
@@ -318,7 +318,7 @@ class ApiWorkflowsHistory:
                     'error': 'Offset must be an int'
                 })
         # Limit max result
-        limit = request.GET.get('limit')
+        limit = request.query.get('limit')
         if limit:
             try:
                 limit = int(limit)
@@ -326,7 +326,7 @@ class ApiWorkflowsHistory:
                 return Response(status=400, body={
                     'error': 'Limit must be an int'
                 })
-        order = request.GET.get('ordering')
+        order = request.query.get('ordering')
         if order:
             try:
                 order = Ordering[order].value
@@ -337,9 +337,9 @@ class ApiWorkflowsHistory:
 
         try:
             count, history = await self.nyuki.storage.get_history(
-                root=(request.GET.get('root') == '1'),
-                full=(request.GET.get('full') == '1'),
-                search=request.GET.get('search'),
+                root=(request.query.get('root') == '1'),
+                full=(request.query.get('full') == '1'),
+                search=request.query.get('search'),
                 order=order,
                 offset=offset, limit=limit, since=since, state=state,
             )
@@ -356,7 +356,7 @@ class ApiWorkflowHistory:
     async def get(self, request, uid):
         try:
             workflow = await self.nyuki.storage.get_instance(
-                uid, (request.GET.get('full') == '1')
+                uid, (request.query.get('full') == '1')
             )
         except AutoReconnect:
             return Response(status=503)
@@ -371,7 +371,7 @@ class ApiWorkflowHistoryTask:
     async def get(self, request, uid, task_id):
         try:
             task = await self.nyuki.storage.get_instance_task(
-                task_id, (request.GET.get('full') == '1')
+                task_id, (request.query.get('full') == '1')
             )
         except AutoReconnect:
             return Response(status=503)

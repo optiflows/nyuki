@@ -70,7 +70,7 @@ class ApiTemplates(_TemplateResource):
         """
         try:
             templates = await self.nyuki.storage.get_templates(
-                full=(request.GET.get('full') == '1'),
+                full=(request.query.get('full') == '1'),
             )
         except AutoReconnect:
             return Response(status=503)
