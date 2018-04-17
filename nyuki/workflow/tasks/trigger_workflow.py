@@ -148,7 +148,6 @@ class TriggerWorkflowTask(TaskHolder):
             }
             async with session.put(**params) as response:
                 if response.status != 200:
-                    log.critical(await response.text())
                     msg = "Can't process workflow template {} on {}".format(
                         self.template, self.nyuki_api
                     )
