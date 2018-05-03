@@ -60,7 +60,7 @@ class MqttBus(Service):
 
     @property
     def name(self):
-        return self._dsn.user
+        return f'{self._dsn.user}-{self._nyuki.id}'
 
     def configure(self, dsn, cafile=None, certfile=None, keyfile=None,
                   keep_alive=60, ping_delay=5):
