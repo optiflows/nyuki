@@ -1,9 +1,10 @@
-from aiohttp import web
-from aiohttp.hdrs import METH_ALL
 import asyncio
-from functools import partial
 import json
 import logging
+from functools import partial
+
+from aiohttp import web
+from aiohttp.hdrs import METH_ALL
 
 from nyuki.services import Service
 from nyuki.utils import serialize_object
@@ -135,27 +136,33 @@ class ResourceClass:
         self.versions = versions
         self.content_type = content_type
 
-    def _add_routes(self, router, path):
-        resource = router.add_resource(path)
+    def _add_routes(self, path):
+        routes = []
         cls_instance = self.cls()
         for method in METH_ALL:
             handler = getattr(self.cls, method.lower(), None)
-            if handler is not None:
-                async_handler = asyncio.coroutine(partial(handler, cls_instance))
-                async_handler.CONTENT_TYPE = getattr(
-                    handler, 'CONTENT_TYPE', self.content_type
-                )
-                route = resource.add_route(method, async_handler)
-                log.debug('Added route: %s', route)
+            if handler is None:
+                continue
+            async_handler = asyncio.coroutine(partial(handler, cls_instance))
+            async_handler.CONTENT_TYPE = getattr(
+                handler, 'CONTENT_TYPE', self.content_type
+            )
+            # Use 'web.get()', 'web.put()'...
+            route = getattr(web, method.lower())(path, async_handler)
+            log.debug('Added route: %s', route)
+            routes.append(route)
+        return routes
 
-    def register(self, nyuki, router):
+    def register(self, nyuki, app):
+        routes = []
         self.cls.nyuki = nyuki
         if not self.versions:
-            self._add_routes(router, self.path)
+            routes.extend(self._add_routes(self.path))
         else:
             for version in self.versions:
                 route = '/{}{}'.format(version, self.path)
-                self._add_routes(router, route)
+                routes.extend(self._add_routes(route))
+        app.add_routes(routes)
 
 
 class Api(Service):
@@ -181,13 +188,11 @@ class Api(Service):
     def __init__(self, nyuki):
         self._nyuki = nyuki
         self._nyuki.register_schema(self.CONF_SCHEMA)
-        self._loop = self._nyuki.loop or asyncio.get_event_loop()
         self._host = None
         self._port = None
         self._middlewares = [mw_capability]
         self._app = None
-        self._handler = None
-        self._server = None
+        self._runner = None
 
     @property
     def capabilities(self):
@@ -202,22 +207,17 @@ class Api(Service):
         Expose capabilities by building the HTTP server.
         The server will be started with the event loop.
         """
-        self._app = web.Application(
-            loop=self._loop, middlewares=self._middlewares
-        )
+        self._app = web.Application(middlewares=self._middlewares)
         for resource in self._nyuki.HTTP_RESOURCES:
-            resource.RESOURCE_CLASS.register(self._nyuki, self._app.router)
-        log.info("Starting the http server on {}:{}".format(self._host, self._port))
-        self._handler = self._app.make_handler(access_log=access_log)
-        self._server = await self._loop.create_server(
-            self._handler, host=self._host, port=self._port
-        )
+            resource.RESOURCE_CLASS.register(self._nyuki, self._app)
+        log.info('Starting the http server on %s:%s', self._host, self._port)
+        self._runner = web.AppRunner(self._app, access_log=access_log)
+        await self._runner.setup()
+        site = web.TCPSite(self._runner, self._host, self._port)
+        await site.start()
 
     async def stop(self):
-        log.info('Stopped the http server')
-        self._server.close()
-        await self._handler.shutdown()
-        await self._server.wait_closed()
+        await self._runner.cleanup()
         self._app = None
-        self._handler = None
-        self._server = None
+        self._runner = None
+        log.info('Stopped the http server')
