@@ -45,13 +45,14 @@ class TestResourceClass(TestCase):
             self.TestResource, '/test', ['v1', 'v2'], 'application/json'
         )
 
-    @patch('aiohttp.web_urldispatcher.Resource.add_route')
-    def test_001_register(self, add_route):
+    def test_001_register(self):
         router = UrlDispatcher()
         router.post_init(Mock())
         self.resource_cls.register(Mock(), router)
         # GET /v1/test
+        # HEAD /v2/test
         # DELETE /v1/test
         # GET /v2/test
+        # HEAD /v2/test
         # DELETE /v2/test
-        self.assertEqual(add_route.call_count, 4)
+        self.assertEqual(len(router.routes()), 6)
