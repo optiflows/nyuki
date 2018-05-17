@@ -3,13 +3,18 @@
 from setuptools import setup, find_packages
 try:  # for pip >= 10
     from pip._internal.req import parse_requirements
+    from pip._internal.exceptions import InstallationError
 except ImportError:  # for pip <= 9.0.3
     from pip.req import parse_requirements
+    from pip.req import InstallationError
 
-
-# Requirements
-install_reqs = parse_requirements('requirements.txt', session='dummy')
-reqs = [str(ir.req) for ir in install_reqs]
+try:
+    # Used to get requirements in production builds
+    install_reqs = parse_requirements('requirements.txt', session='dummy')
+    reqs = [str(ir.req) for ir in install_reqs]
+except InstallationError:
+    # Developers use Pipenv instead that also deals with requirements
+    reqs = []
 
 try:
     with open('VERSION.txt', 'r') as v:
@@ -22,10 +27,10 @@ with open('DESCRIPTION', 'r') as d:
 
 setup(
     name='nyuki',
-    description='Allowing the creation of independent unit to deal with stream processing while exposing an MQTT and REST API.',
+    description='Base library to create microservices with MQTT and HTTP REST API.',
     long_description=long_description,
-    url='http://www.surycat.com',
-    author='Optiflows R&D',
+    url='http://www.enovacom.fr',
+    author='Enovacom Surycat',
     author_email='rand@surycat.com',
     version=version,
     install_requires=reqs,
@@ -38,5 +43,5 @@ setup(
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3 :: Only',
-    ],
+    ]
 )
