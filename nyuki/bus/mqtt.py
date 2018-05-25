@@ -60,7 +60,7 @@ class MqttBus(Service):
 
     @property
     def name(self):
-        return f'{self._dsn.user}-{self._nyuki.id}'
+        return self._dsn.user
 
     def configure(self, dsn, cafile=None, certfile=None, keyfile=None,
                   keep_alive=60, ping_delay=5):
@@ -73,7 +73,7 @@ class MqttBus(Service):
 
         self._cafile = cafile
         self.client = MQTTClient(
-            client_id=self.name,
+            client_id=f'{self.name}-{self._nyuki.id}',
             config={
                 'auto_reconnect': False,
                 'certfile': certfile,
