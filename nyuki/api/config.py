@@ -31,18 +31,3 @@ class ApiConfiguration:
         asyncio.ensure_future(self.nyuki._reload_config(body))
 
         return Response(self.nyuki._config)
-
-
-@resource('/swagger', versions=['v1'])
-class ApiSwagger:
-
-    async def get(self, request):
-        try:
-            with open('swagger.json', 'r') as f:
-                body = json.loads(f.read())
-        except OSError:
-            return Response(status=404, body={
-                'error': 'Missing swagger documentation'
-            })
-
-        return Response(body=body)

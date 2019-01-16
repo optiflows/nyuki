@@ -9,16 +9,13 @@ from signal import SIGHUP, SIGINT, SIGTERM
 
 from .api import Api
 from .api.bus import ApiBusTopics, ApiBusPublish
-from .api.config import ApiConfiguration, ApiSwagger
+from .api.config import ApiConfiguration
 from .bus import MqttBus
 from .commands import get_command_kwargs
 from .config import get_full_config, write_conf_json, merge_configs
 from .debugging import StackSampler, ApiSampleEmitter
 from .logs import DEFAULT_LOGGING
 from .services import ServiceManager
-from .discovery import Discovery
-from .raft import RaftProtocol, ApiRaft
-from .memory import Memory
 
 
 log = logging.getLogger(__name__)
@@ -43,7 +40,6 @@ class Nyuki:
         'type': 'object',
         'required': ['log'],
         'properties': {
-            'service': {'type': 'string', 'minLength': 1},
             'trace': {'type': 'boolean'},
         }
     }
@@ -53,8 +49,6 @@ class Nyuki:
         ApiBusPublish,
         ApiBusTopics,
         ApiConfiguration,
-        ApiSwagger,
-        ApiRaft,
         ApiSampleEmitter,
     ]
 
@@ -95,19 +89,6 @@ class Nyuki:
             bus_service = bus_config.get('service', 'mqtt')
             if bus_service == 'mqtt':
                 self._services.add('bus', MqttBus(self))
-
-        # Add NaaS (nyuki-as-a-service) related services
-        if self._config.get('service'):
-            # Discovery
-            method = self._config.get('discovery', {}).get('method', 'dns')
-            discovery = Discovery.get(method)
-            self._services.add('discovery', discovery(self))
-            # Raft
-            self._services.add('raft', RaftProtocol(self))
-            self.discovery.register(self.raft.discovery_handler)
-            # Memory
-            if self._config.get('memory'):
-                self._services.add('memory', Memory(self))
 
         self.is_stopping = False
 
