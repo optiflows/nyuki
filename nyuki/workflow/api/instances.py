@@ -90,7 +90,6 @@ class ApiWorkflows(_WorkflowResource):
         if exec:
             # Suspended/crashed instance
             # The request's payload is the last known execution report
-            templates = [request]
             if exec['id'] in self.nyuki.running_workflows:
                 return Response(status=400, body={
                     'error': 'This workflow is already being rescued'
@@ -144,7 +143,7 @@ class ApiWorkflows(_WorkflowResource):
 
         # Keep full instance+template in nyuki's memory
         wfinst = self.nyuki.new_workflow(
-            template, wflow,
+            wf_tmpl.as_dict(), wflow,
             track=exec_track,
             requester=requester
         )

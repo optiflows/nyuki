@@ -36,7 +36,8 @@ class WorkflowTemplatesCollection:
         "topics": [<str>],
         "graph": {},
         "version": <int>,
-        "state": <draft | active | archived>
+        "state": <draft | active | archived>,
+        "schema": <int>
     }
     """
 
