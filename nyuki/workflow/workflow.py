@@ -1,8 +1,5 @@
-import json
 import asyncio
 import logging
-import pickle
-import aiohttp
 from uuid import uuid4
 from copy import deepcopy
 from random import shuffle
