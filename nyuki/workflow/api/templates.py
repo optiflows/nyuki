@@ -84,6 +84,9 @@ class ApiTemplates(_TemplateResource):
         if 'id' in request:
             del request['id']
 
+        # Set hard workflow schema
+        request['schema'] = 2
+
         if 'title' not in request:
             return Response(status=400, body={
                 'error': "workflow 'title' is mandatory"

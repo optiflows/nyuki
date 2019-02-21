@@ -143,7 +143,7 @@ class ApiWorkflows(_WorkflowResource):
 
         # Keep full instance+template in nyuki's memory
         wfinst = self.nyuki.new_workflow(
-            wf_tmpl.as_dict(), wflow,
+            template, wflow,
             track=exec_track,
             requester=requester
         )
