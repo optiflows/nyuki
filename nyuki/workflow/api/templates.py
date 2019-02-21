@@ -84,8 +84,8 @@ class ApiTemplates(_TemplateResource):
         if 'id' in request:
             del request['id']
 
-        # Set hard workflow schema
-        request['schema'] = 2
+        # Set workflow schema from nyuki's status
+        request['schema'] = self.nyuki.schema
 
         if 'title' not in request:
             return Response(status=400, body={

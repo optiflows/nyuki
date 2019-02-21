@@ -210,6 +210,7 @@ class WorkflowNyuki(Nyuki):
         super().__init__(**kwargs)
         self.migrate_config()
         self.register_schema(self.CONF_SCHEMA)
+        self.schema = 1
         self.engine = None
         self.storage = MongoStorage()
 
