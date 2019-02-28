@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "86d65271c7d68e65d4b8174b18bf26e9b0b2b246e6fb188ed7458debe23f4055"
+            "sha256": "7d8f1289ed06097939043de7de78360ed4a8cb7cc45853725102847e6a7ea8bf"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -223,10 +223,10 @@
         },
         "tukio": {
             "hashes": [
-                "sha256:18d0abb2305e6c9255d69489e4cc7f9e3ff45b1bc60df2315c33be47fbb74227"
+                "sha256:f1378eca3fce17c1bd057a198f3f9561d5b4513800edec861da9bfcf386c1475"
             ],
             "index": "pypi",
-            "version": "==0.15.4"
+            "version": "==0.16.0"
         },
         "typing-extensions": {
             "hashes": [
