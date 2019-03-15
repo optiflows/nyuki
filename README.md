@@ -1,6 +1,6 @@
 # Nyuki :bee:
 
-[![Circle CI](https://img.shields.io/circleci/project/optiflows/nyuki/master.svg)](https://circleci.com/gh/optiflows/nyuki)
+[![Circle CI](https://img.shields.io/circleci/project/surycat/nyuki/master.svg)](https://circleci.com/gh/surycat/nyuki)
 [![pypi version](http://img.shields.io/pypi/v/nyuki.svg)](https://pypi.python.org/pypi/nyuki)
 [![python versions](https://img.shields.io/pypi/pyversions/nyuki.svg)](https://pypi.python.org/pypi/nyuki/)
 
@@ -36,10 +36,10 @@ pip install nyuki
 
 Nyuki's paradigms are convenient for Docker-based environment. We recommend using one container per nyuki implementation.
 
-Read more about the lib. in the [wiki](https://github.com/optiflows/nyuki/wiki):
-* [Examples](https://github.com/optiflows/nyuki/wiki/Examples)
-* [Configuration](https://github.com/optiflows/nyuki/wiki/Configuration)
-* [Features](https://github.com/optiflows/nyuki/wiki/Features)
+Read more about the lib. in the [wiki](https://github.com/surycat/nyuki/wiki):
+* [Examples](https://github.com/surycat/nyuki/wiki/Examples)
+* [Configuration](https://github.com/surycat/nyuki/wiki/Configuration)
+* [Features](https://github.com/surycat/nyuki/wiki/Features)
 
 ## Contributing
 

@@ -155,7 +155,7 @@ class WorkflowNyuki(Nyuki):
     """
     Generic workflow nyuki allowing data storage and manipulation
     of tukio's workflows.
-    https://github.com/optiflows/tukio
+    https://github.com/surycat/tukio
     """
 
     CONF_SCHEMA = {
