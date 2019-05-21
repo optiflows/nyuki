@@ -37,13 +37,19 @@ class WorkflowInstancesCollection:
 
     async def index(self):
         # Workflow
-        await self._instances.create_index('id', unique=True)
-        await self._instances.create_index('state')
-        await self._instances.create_index('requester')
+        await self._instances.create_index('id', unique=True, name='uid')
+        await self._instances.create_index('state', name='state')
+        await self._instances.create_index('requester', name='requester')
         # Search and sorting indexes
-        await self._instances.create_index('template.title')
-        await self._instances.create_index([('start', DESCENDING)])
-        await self._instances.create_index([('end', DESCENDING)])
+        await self._instances.create_index('template.title', name='wf_title')
+        await self._instances.create_index(
+            [('start', DESCENDING)],
+            name='sort_start',
+        )
+        await self._instances.create_index(
+            [('end', DESCENDING)],
+            name='sort_end',
+        )
 
     async def get_one(self, instance_id, full=False):
         """

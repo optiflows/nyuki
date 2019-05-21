@@ -11,7 +11,7 @@ class TriggerCollection:
         self._triggers = db['triggers']
 
     async def index(self):
-        await self._triggers.create_index('tid', unique=True)
+        await self._triggers.create_index('tid', unique=True, name='tid')
 
     async def get(self):
         """

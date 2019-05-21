@@ -27,11 +27,15 @@ class TaskTemplatesCollection:
 
     async def index(self):
         # Pair of indexes on the workflow template id/version
-        await self._templates.create_index([
-            ('id', ASCENDING),
-            ('workflow_template.id', ASCENDING),
-            ('workflow_template.version', DESCENDING),
-        ], unique=True)
+        await self._templates.create_index(
+            [
+                ('id', ASCENDING),
+                ('workflow_template.id', ASCENDING),
+                ('workflow_template.version', DESCENDING),
+            ],
+            unique=True,
+            name='unique_id_wfid_wfversion',
+        )
 
     async def get(self, workflow_id, version):
         """

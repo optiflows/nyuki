@@ -35,8 +35,8 @@ class TaskInstancesCollection:
         )
 
     async def index(self):
-        await self._instances.create_index('id', unique=True)
-        await self._instances.create_index('workflow_instance_id')
+        await self._instances.create_index('id', unique=True, name='uid')
+        await self._instances.create_index('workflow_instance_id', name='wfinstance_id')
 
     async def get(self, wid, full=False):
         """

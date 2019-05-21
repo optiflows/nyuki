@@ -45,13 +45,15 @@ class WorkflowTemplatesCollection:
         self._templates = db['workflow_templates']
 
     async def index(self):
-        await self._templates.create_index('topics')
+        await self._templates.create_index('topics', name='topics')
         await self._templates.create_index(
             [('id', DESCENDING), ('version', DESCENDING)],
-            unique=True
+            unique=True,
+            name='unique_id_version',
         )
         await self._templates.create_index(
-            [('id', DESCENDING), ('state', DESCENDING)]
+            [('id', DESCENDING), ('state', DESCENDING)],
+            name='unique_id_state',
         )
 
     async def get(self, template_id=None, full=False):

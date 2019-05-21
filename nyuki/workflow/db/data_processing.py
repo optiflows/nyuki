@@ -10,7 +10,7 @@ class DataProcessingCollection:
         self._rules = db[collection_name]
 
     async def index(self):
-        await self._rules.create_index('id', unique=True)
+        await self._rules.create_index('id', unique=True, name='uid')
 
     async def get(self):
         """

@@ -20,7 +20,11 @@ class MetadataCollection:
         self._metadata = db['workflow_metadata']
 
     async def index(self):
-        await self._metadata.create_index('workflow_template_id', unique=True)
+        await self._metadata.create_index(
+            'workflow_template_id',
+            unique=True,
+            name='unique_wftemplate_id',
+        )
 
     async def get_one(self, tid):
         """
