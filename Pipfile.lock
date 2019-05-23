@@ -103,11 +103,11 @@
         },
         "motor": {
             "hashes": [
-                "sha256:68cc2b70a92ac59b95c8eeeefe9132f6481ec6b850e1046927f1ae5019dacd70",
-                "sha256:9508983b090c4aa978ead995ffeba2db026fd5393a2c67380921d2ca52f34d93"
+                "sha256:462fbb824f4289481c158227a2579d6adaf1ec7c70cf7ebe60ed6ceb321e5869",
+                "sha256:d035c09ab422bc50bf3efb134f7405694cae76268545bd21e14fb22e2638f84e"
             ],
             "index": "pypi",
-            "version": "==1.2.5"
+            "version": "==2.0.0"
         },
         "multidict": {
             "hashes": [

@@ -82,7 +82,7 @@ class WorkflowInstancesCollection:
 
         cursor = self._instances.find(query, {'_id': 0})
         # Count total results regardless of limit/offset
-        count = await cursor.count()
+        count = await cursor.count_documents({})
 
         # Sort depending on Order enum values
         if order is not None:
