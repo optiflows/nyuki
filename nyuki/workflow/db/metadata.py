@@ -23,7 +23,7 @@ class MetadataCollection:
         await self._metadata.create_index(
             'workflow_template_id',
             unique=True,
-            name='unique_wftemplate_id',
+            name='unique_workflow_template_id'
         )
 
     async def get_one(self, tid):

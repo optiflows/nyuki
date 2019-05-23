@@ -34,7 +34,7 @@ class TaskTemplatesCollection:
                 ('workflow_template.version', DESCENDING),
             ],
             unique=True,
-            name='unique_id_wfid_wfversion',
+            name='unique_uid_workflow_template_id_version'
         )
 
     async def get(self, workflow_id, version):

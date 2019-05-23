@@ -41,14 +41,14 @@ class WorkflowInstancesCollection:
         await self._instances.create_index('state', name='state')
         await self._instances.create_index('requester', name='requester')
         # Search and sorting indexes
-        await self._instances.create_index('template.title', name='wf_title')
         await self._instances.create_index(
-            [('start', DESCENDING)],
-            name='sort_start',
+            'template.title', name='template_title'
         )
         await self._instances.create_index(
-            [('end', DESCENDING)],
-            name='sort_end',
+            [('start', DESCENDING)], name='sort_start'
+        )
+        await self._instances.create_index(
+            [('end', DESCENDING)], name='sort_end'
         )
 
     async def get_one(self, instance_id, full=False):

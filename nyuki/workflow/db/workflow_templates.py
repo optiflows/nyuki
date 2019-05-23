@@ -49,11 +49,11 @@ class WorkflowTemplatesCollection:
         await self._templates.create_index(
             [('id', DESCENDING), ('version', DESCENDING)],
             unique=True,
-            name='unique_id_version',
+            name='unique_uid_version'
         )
         await self._templates.create_index(
             [('id', DESCENDING), ('state', DESCENDING)],
-            name='unique_id_state',
+            name='uid_state'
         )
 
     async def get(self, template_id=None, full=False):
