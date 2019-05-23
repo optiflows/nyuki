@@ -3,8 +3,11 @@ import asyncio
 import logging
 from enum import Enum
 from datetime import datetime, timezone
+
 from bson.codec_options import CodecOptions
 from pymongo import DESCENDING, ASCENDING
+
+from .utils.indexes import check_index_names
 
 
 log = logging.getLogger(__name__)
@@ -36,8 +39,12 @@ class WorkflowInstancesCollection:
         )
 
     async def index(self):
+        await check_index_names(self._instances, [
+            'unique_id', 'state', 'requester', 'template_title',
+            'sort_start', 'sort_end',
+        ])
         # Workflow
-        await self._instances.create_index('id', unique=True, name='uid')
+        await self._instances.create_index('id', unique=True, name='unique_id')
         await self._instances.create_index('state', name='state')
         await self._instances.create_index('requester', name='requester')
         # Search and sorting indexes

@@ -2,6 +2,8 @@ import logging
 
 from pymongo import ReturnDocument
 
+from .utils.indexes import check_index_names
+
 
 log = logging.getLogger(__name__)
 
@@ -20,10 +22,11 @@ class MetadataCollection:
         self._metadata = db['workflow_metadata']
 
     async def index(self):
+        await check_index_names(self._metadata, ['unique_workflow_template_id'])
         await self._metadata.create_index(
             'workflow_template_id',
             unique=True,
-            name='unique_workflow_template_id'
+            name='unique_workflow_template_id',
         )
 
     async def get_one(self, tid):

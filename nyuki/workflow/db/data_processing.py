@@ -1,5 +1,7 @@
 import logging
 
+from .utils.indexes import check_index_names
+
 
 log = logging.getLogger(__name__)
 
@@ -10,7 +12,8 @@ class DataProcessingCollection:
         self._rules = db[collection_name]
 
     async def index(self):
-        await self._rules.create_index('id', unique=True, name='uid')
+        await check_index_names(self._rules, ['unique_id'])
+        await self._rules.create_index('id', unique=True, name='unique_id')
 
     async def get(self):
         """

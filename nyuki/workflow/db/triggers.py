@@ -1,6 +1,8 @@
 import asyncio
 import logging
 
+from .utils.indexes import check_index_names
+
 
 log = logging.getLogger(__name__)
 
@@ -11,7 +13,8 @@ class TriggerCollection:
         self._triggers = db['triggers']
 
     async def index(self):
-        await self._triggers.create_index('tid', unique=True, name='tid')
+        await check_index_names(self._triggers, ['unique_tid'])
+        await self._triggers.create_index('tid', unique=True, name='unique_tid')
 
     async def get(self):
         """

@@ -1,7 +1,10 @@
 import asyncio
 import logging
 from enum import Enum
+
 from pymongo import DESCENDING
+
+from .utils.indexes import check_index_names
 
 
 log = logging.getLogger(__name__)
@@ -45,15 +48,18 @@ class WorkflowTemplatesCollection:
         self._templates = db['workflow_templates']
 
     async def index(self):
+        await check_index_names(self._templates, [
+            'topics', 'unique_id_version', 'id_state',
+        ])
         await self._templates.create_index('topics', name='topics')
         await self._templates.create_index(
             [('id', DESCENDING), ('version', DESCENDING)],
             unique=True,
-            name='unique_uid_version'
+            name='unique_id_version',
         )
         await self._templates.create_index(
             [('id', DESCENDING), ('state', DESCENDING)],
-            name='uid_state'
+            name='id_state',
         )
 
     async def get(self, template_id=None, full=False):

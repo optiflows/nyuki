@@ -1,6 +1,9 @@
 import asyncio
 import logging
+
 from pymongo import ASCENDING, DESCENDING
+
+from .utils.indexes import check_index_names
 
 
 log = logging.getLogger(__name__)
@@ -26,6 +29,9 @@ class TaskTemplatesCollection:
         self._templates = db['task_templates']
 
     async def index(self):
+        await check_index_names(
+            self._templates, ['unique_uid_workflow_template_id_version'],
+        )
         # Pair of indexes on the workflow template id/version
         await self._templates.create_index(
             [

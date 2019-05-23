@@ -1,6 +1,9 @@
 import logging
 from datetime import timezone
+
 from bson.codec_options import CodecOptions
+
+from .utils.indexes import check_index_names
 
 
 log = logging.getLogger(__name__)
@@ -35,11 +38,13 @@ class TaskInstancesCollection:
         )
 
     async def index(self):
-        await self._instances.create_index(
-            'id', unique=True, name='unique_uid'
+        await check_index_names(
+            self._instances, ['unique_id', 'workflow_instance_id'],
         )
+        await self._instances.create_index('id', unique=True, name='unique_id')
         await self._instances.create_index(
-            'workflow_instance_id', name='workflow_instance_id'
+            'workflow_instance_id',
+            name='workflow_instance_id',
         )
 
     async def get(self, wid, full=False):
