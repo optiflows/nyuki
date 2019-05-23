@@ -10,11 +10,9 @@ python_version = '3.6'
 aiohttp = ">=3.5,<3.6"
 hbmqtt = "<0.10,>=0.9"
 jsonschema = "<2.7,>=2.6"
-motor = "<1.3,>=1.2"
+motor = "<2.1,>=2.0"
 pijon = "<0.2,>=0.1"
 tukio = "<0.17,>=0.16"
-# https://nvd.nist.gov/vuln/detail/CVE-2017-18342
-pyyaml = "==4.2b4"
 
 [dev-packages]
 asynctest = ">=0.5,<0.6"
