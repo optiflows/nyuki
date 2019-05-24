@@ -74,7 +74,7 @@ class MongoStorage:
                 break
 
         if self._validate_on_start is True:
-            collections = await self._db.collection_names()
+            collections = await self._db.list_collection_names()
             log.info('Validating %s collections', len(collections))
             for collection in collections:
                 await self._db.validate_collection(collection)
