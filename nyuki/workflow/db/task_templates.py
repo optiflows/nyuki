@@ -1,7 +1,8 @@
-import asyncio
 import logging
 
 from pymongo import ASCENDING, DESCENDING
+from pymongo import ReplaceOne
+from pymongo.errors import BulkWriteError
 
 from .utils.indexes import check_index_names
 
@@ -71,22 +72,29 @@ class TaskTemplatesCollection:
         })
 
         # Re-update all the tasks.
-        must_execute = False
-        bulk = self._templates.initialize_unordered_bulk_op()
+        ops = []
         for task in tasks:
-            must_execute = True
             task['workflow_template'] = {
                 'id': template['id'],
                 'version': template['version'],
             }
-            bulk.find({
-                'id': task['id'],
-                'workflow_template.id': template['id'],
-                'workflow_template.version': template['version'],
-            }).upsert().replace_one(task)
+            ops.append(ReplaceOne(
+                {
+                    'id': task['id'],
+                    'workflow_template.id': template['id'],
+                    'workflow_template.version': template['version']
+                },
+                task, upsert=True
+            ))
 
-        if must_execute is True:
-            await bulk.execute()
+        if ops:
+            try:
+                await self._templates.bulk_write(ops, ordered=False)
+            except BulkWriteError as exc:
+                log.error(
+                    'Errors while updating tasks in workflow template %s: %s',
+                    template['id'], exc.details
+                )
 
     async def delete_many(self, tid):
         """
