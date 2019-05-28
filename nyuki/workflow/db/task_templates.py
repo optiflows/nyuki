@@ -1,7 +1,6 @@
 import logging
 
-from pymongo import ASCENDING, DESCENDING
-from pymongo import ReplaceOne
+from pymongo import ASCENDING, DESCENDING, ReplaceOne
 from pymongo.errors import BulkWriteError
 
 from .utils.indexes import check_index_names
