@@ -1,4 +1,5 @@
 import logging
+import os
 from copy import deepcopy
 
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -34,14 +35,21 @@ class MongoStorage:
         self.triggers = None
 
     def configure(self, host, database, validate_on_start=True, **kwargs):
-        log.info(
-            "Setting up mongo storage with host '%s' and database '%s'",
-            host, database,
-        )
+        log.info("Setting up mongo storage with host '%s'", host)
         self._client = AsyncIOMotorClient(host, **kwargs)
-        self._db = self._client[database]
         self._validate_on_start = validate_on_start
+        self._db_name = database
 
+    async def index(self):
+        """
+        Try to connect to mongo and index all the collections.
+        """
+        if self._db_name not in await self._client.list_database_names():
+            # If the old mongo DB does not exist, use the new tenant format
+            self._db_name = f"{os.environ.get('TENANT_ID', 'dev')}#{self._db_name}"
+        log.info("Selected database '%s'", self._db_name)
+
+        self._db = self._client[self._db_name]
         # Collections
         self._workflow_templates = WorkflowTemplatesCollection(self._db)
         self._task_templates = TaskTemplatesCollection(self._db)
@@ -52,10 +60,6 @@ class MongoStorage:
         self.lookups = DataProcessingCollection(self._db, 'lookups')
         self.triggers = TriggerCollection(self._db)
 
-    async def index(self):
-        """
-        Try to connect to mongo and index all the collections.
-        """
         log.info('Trying to connect to Mongo...')
         while True:
             try:
