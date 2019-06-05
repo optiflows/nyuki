@@ -46,7 +46,7 @@ class MongoStorage:
         """
         if self._db_name not in await self._client.list_database_names():
             # If the old mongo DB does not exist, use the new tenant format
-            self._db_name = f"{os.environ.get('TENANT_ID', 'dev')}#{self._db_name}"
+            self._db_name = f"{os.environ['TENANT_ID']}#{self._db_name}"
         log.info("Selected database '%s'", self._db_name)
 
         self._db = self._client[self._db_name]
