@@ -1,4 +1,6 @@
-A lightweight library designed to build nyukis (Python 3.4 only!). It provides features that shall help developers with managing the following topics while developing a nyuki:
+! This package is not maintained anymore and the last version is 0.57.1 !
+
+A lightweight library designed to build nyukis (Python 3.6 only!). It provides features that shall help developers with managing the following topics while developing a nyuki:
 
 * Expose features through the own nyuki RESTful API
 * Communication between nyukis (over HTTP and MQTT)

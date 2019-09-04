@@ -1,9 +1,10 @@
+:warning: This repository is not maintained anymore and the last version of Nyuki is 0.57.1
+
 # Nyuki :bee:
 
 [![Circle CI](https://img.shields.io/circleci/project/surycat/nyuki/master.svg)](https://circleci.com/gh/surycat/nyuki)
 [![pypi version](http://img.shields.io/pypi/v/nyuki.svg)](https://pypi.python.org/pypi/nyuki)
 [![python versions](https://img.shields.io/pypi/pyversions/nyuki.svg)](https://pypi.python.org/pypi/nyuki/)
-
 
 ## tl;dr
 A lightweight Python library designed to implement agents (aka nyukis). It provides features that shall help developers with managing the following topics:
